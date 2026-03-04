@@ -21,12 +21,10 @@
 </div>
 <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.5/babel.min.js"></script>
 
 <script>
-// Tüm kütüphaneler yüklendikten sonra uygulamayı başlat
 window.addEventListener('load', function() {
   var appScript = document.getElementById('app-code');
   var code = appScript.textContent;
@@ -37,7 +35,67 @@ window.addEventListener('load', function() {
 
 <script id="app-code" type="text/plain">
 const {useState,useRef,useMemo}=React;
-const {BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,LineChart,Line}=Recharts;
+
+// ── Hafif SVG grafik bileşenleri (Recharts yerine) ────────────────────────
+function PieChart({data,colors}){
+  const size=160,cx=80,cy=80,r=55,ir=32;
+  const total=data.reduce((s,d)=>s+d.value,0);
+  if(total===0)return null;
+  let angle=-Math.PI/2;
+  const slices=data.map((d,i)=>{
+    const a=(d.value/total)*2*Math.PI;
+    const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(angle+a),y2=cy+r*Math.sin(angle+a);
+    const ix1=cx+ir*Math.cos(angle),iy1=cy+ir*Math.sin(angle);
+    const ix2=cx+ir*Math.cos(angle+a),iy2=cy+ir*Math.sin(angle+a);
+    const large=a>Math.PI?1:0;
+    const path=`M${ix1},${iy1} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${ix2},${iy2} A${ir},${ir},0,${large},0,${ix1},${iy1}Z`;
+    angle+=a;
+    return <path key={i} d={path} fill={colors[i%colors.length]} opacity={0.9}/>;
+  });
+  return <svg width={size} height={size} style={{display:'block',margin:'0 auto'}}>{slices}</svg>;
+}
+
+function BarChartH({data,color='#c0392b'}){
+  if(!data||data.length===0)return null;
+  const max=Math.max(...data.map(d=>d.value),1);
+  return <div style={{padding:'4px 0'}}>
+    {data.map((d,i)=>(
+      <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+        <div style={{width:80,fontSize:10,color:'#555',textAlign:'right',flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.label}</div>
+        <div style={{flex:1,background:'#f5f5f5',borderRadius:99,height:18,overflow:'hidden'}}>
+          <div style={{width:`${(d.value/max)*100}%`,height:'100%',background:color,borderRadius:99,transition:'width .5s',display:'flex',alignItems:'center',paddingLeft:6}}>
+            {(d.value/max)>0.25&&<span style={{fontSize:9,color:'#fff',fontWeight:600,whiteSpace:'nowrap'}}>{new Intl.NumberFormat('tr-TR',{maximumFractionDigits:0}).format(d.value)}₺</span>}
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>;
+}
+
+function LineChartSimple({data}){
+  if(!data||data.length<2)return null;
+  const W=300,H=80,pad=30;
+  const vals=data.map(d=>d.value);
+  const minV=Math.min(...vals),maxV=Math.max(...vals,1);
+  const pts=data.map((d,i)=>{
+    const x=pad+(i/(data.length-1))*(W-pad*2);
+    const y=H-pad-((d.value-minV)/(maxV-minV||1))*(H-pad*2);
+    return [x,y];
+  });
+  const polyline=pts.map(p=>p.join(',')).join(' ');
+  return <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
+    <polyline points={polyline} fill="none" stroke="#c0392b" strokeWidth="2.5" strokeLinejoin="round"/>
+    {pts.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="4" fill="#c0392b"/>)}
+    {data.map((d,i)=>{
+      const [x,y]=pts[i];
+      return <text key={i} x={x} y={H-4} textAnchor="middle" fontSize="9" fill="#888">{d.label}</text>;
+    })}
+    {pts.map(([x,y],i)=>{
+      return <text key={i} x={x} y={y-8} textAnchor="middle" fontSize="9" fill="#c0392b" fontWeight="600">{data[i].value}K</text>;
+    })}
+  </svg>;
+}
 
 const COLORS=["#e74c3c","#e67e22","#f1c40f","#2ecc71","#3498db","#9b59b6"];
 const MONTHS=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
@@ -305,7 +363,7 @@ function App(){
   const btnS=(bg="#16a085")=>({...btnP,background:bg});
 
   const pieData=debts.map(d=>({name:d.name,value:d.remaining}));
-  const chartData=Array.from({length:6},(_,i)=>{const m=new Date(2026,2+i,1);return{ay:MONTHS[m.getMonth()].slice(0,3),kalan:Math.max(0,Math.round((totalDebt-totalMonthly*(i+1)*1.05)/1000))};});
+  const chartData=Array.from({length:6},(_,i)=>{const m=new Date(2026,2+i,1);return{label:MONTHS[m.getMonth()].slice(0,3),value:Math.max(0,Math.round((totalDebt-totalMonthly*(i+1)*1.05)/1000))};});
   const catData=CATS.map(c=>({name:c.name,tutar:expenses.filter(e=>e.category===c.name).reduce((s,e)=>s+e.amount,0)})).filter(c=>c.tutar>0);
 
   // ── RENDER ───────────────────────────────────────────────────────────────
@@ -384,12 +442,8 @@ function App(){
         {tab==="ozet"&&<>
           <Card>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>Borç Dağılımı</div>
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart><Pie data={pieData} cx="50%" cy="50%" innerRadius={44} outerRadius={72} dataKey="value" paddingAngle={3}>
-                {pieData.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
-              </Pie><Tooltip formatter={v=>fmt(v)}/></PieChart>
-            </ResponsiveContainer>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            <PieChart data={pieData} colors={COLORS}/>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
               {debts.map((d,i)=><div key={d.id} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}>
                 <div style={{width:8,height:8,borderRadius:"50%",background:COLORS[i%COLORS.length]}}/>
                 <span style={{color:"#666"}}>{d.name.split(" ").slice(0,3).join(" ")}</span>
@@ -398,10 +452,7 @@ function App(){
           </Card>
           <Card>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>6 Aylık Borç Tahmini</div>
-            <ResponsiveContainer width="100%" height={110}>
-              <LineChart data={chartData}><XAxis dataKey="ay" tick={{fontSize:10}}/><YAxis tick={{fontSize:9}} tickFormatter={v=>`${v}K`}/>
-              <Tooltip formatter={v=>`${v}K ₺`}/><Line type="monotone" dataKey="kalan" stroke="#c0392b" strokeWidth={2} dot={{fill:"#c0392b",r:3}}/></LineChart>
-            </ResponsiveContainer>
+            <LineChartSimple data={chartData}/>
           </Card>
           <Card>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>Bu Ay Özeti</div>
@@ -681,13 +732,7 @@ function App(){
 
           {catData.length>0&&<Card>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>Kategorilere Göre</div>
-            <ResponsiveContainer width="100%" height={140}>
-              <BarChart data={catData} layout="vertical">
-                <XAxis type="number" tick={{fontSize:9}} tickFormatter={v=>`${(v/1000).toFixed(0)}K`}/>
-                <YAxis type="category" dataKey="name" tick={{fontSize:10}} width={80}/>
-                <Tooltip formatter={v=>fmt(v)}/><Bar dataKey="tutar" fill="#c0392b" radius={[0,6,6,0]}/>
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChartH data={catData.map(c=>({label:c.name,value:c.tutar}))} color="#c0392b"/>
           </Card>}
 
           {[...expenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
