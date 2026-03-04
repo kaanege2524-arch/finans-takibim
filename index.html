@@ -121,11 +121,17 @@ const initIncomes=[
   {id:2,label:"Fazla Mesai",amount:1200,date:"2026-03-20",recurring:true},
 ];
 
-const CATS=[
+const BASE_CATS=[
   {name:"Market",icon:"🛒"},{name:"Faturalar",icon:"💡"},{name:"Ulaşım",icon:"🚌"},
   {name:"Sağlık",icon:"💊"},{name:"Giyim",icon:"👕"},{name:"Yemek/Dışarı",icon:"🍽️"},
   {name:"Eğlence",icon:"🎬"},{name:"Eğitim",icon:"📚"},{name:"Diğer",icon:"📌"},
 ];
+
+const initRecurring=[
+  {id:1,category:"Ev Kirası",icon:"🏠",amount:8500,dayOfMonth:1,startDate:"2026-03-01",totalMonths:12,payMethod:"nakit",cardId:null,note:"Yıllık kira sözleşmesi"},
+];
+
+const ICONS=["🏠","🚗","📱","💈","🎓","🏋️","🐾","💊","🔌","🌐","🎵","📦","🍼","🧹","💰","📌"];
 
 const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0}).format(n);
 
@@ -195,11 +201,18 @@ function App(){
   const [tab,setTab]=useState("ozet");
   const [debts,setDebts]=useState(initDebts);
   const [expenses,setExpenses]=useState(initExpenses);
+  const [recurringExp,setRecurringExp]=useState(initRecurring);
+  const [customCats,setCustomCats]=useState([{name:"Ev Kirası",icon:"🏠"}]);
   const [incomes,setIncomes]=useState(initIncomes);
   const [salary,setSalary]=useState(28500);
   const [salaryInput,setSalaryInput]=useState("28500");
   const [aiLoading,setAiLoading]=useState(false);
   const [aiAdvice,setAiAdvice]=useState(null);
+  const [chatMessages,setChatMessages]=useState([]);
+  const [chatInput,setChatInput]=useState("");
+  const [chatLoading,setChatLoading]=useState(false);
+  const chatEndRef=useRef(null);
+  const chatInputRef=useRef(null);
   const [showFullPlan,setShowFullPlan]=useState(false);
   const [suggApplied,setSuggApplied]=useState(false);
 
@@ -208,7 +221,12 @@ function App(){
   const [showAddDebt,setShowAddDebt]=useState(false);
   const [showAddExp,setShowAddExp]=useState(false);
   const [showAddIncome,setShowAddIncome]=useState(false);
-  const [showPurchase,setShowPurchase]=useState(false);  // kart alışverişi
+  const [showPurchase,setShowPurchase]=useState(false);
+  const [showAddRecurring,setShowAddRecurring]=useState(false);
+  const [showAddCat,setShowAddCat]=useState(false);
+  const [editRecurringId,setEditRecurringId]=useState(null);
+  const [monthlyReport,setMonthlyReport]=useState(null);
+  const [reportLoading,setReportLoading]=useState(false);  // kart alışverişi
 
   const blankDebt={name:"",type:"kredi",remaining:"",monthly:"",rate:"",months:"",payDay:"",userPayment:"",kesimGunu:"",sonOdemeGunu:""};
   const [dForm,setDForm]=useState(blankDebt);
@@ -217,19 +235,123 @@ function App(){
   const [eForm,setEForm]=useState(blankExp);
   const [editExpId,setEditExpId]=useState(null);
 
+  const blankRecurring={category:"",icon:"🏠",amount:"",dayOfMonth:1,startDate:new Date().toISOString().slice(0,10),totalMonths:12,payMethod:"nakit",cardId:"",note:""};
+  const [rForm,setRForm]=useState(blankRecurring);
+  const [catForm,setCatForm]=useState({name:"",icon:"📌"});
+
   const [iForm,setIForm]=useState({label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:false});
 
   // Kart alışverişi formu
   const blankPurchase={cardId:"",description:"",amount:"",installments:1,date:new Date().toISOString().slice(0,10)};
   const [pForm,setPForm]=useState(blankPurchase);
 
-  // Hesaplamalar
+  // Tarih sabitleri — tüm hesaplamalardan önce
   const curMonth=new Date().toISOString().slice(0,7);
+
+  // Dinamik kategori listesi
+  const CATS=useMemo(()=>[...BASE_CATS,...customCats.filter(c=>!BASE_CATS.find(b=>b.name===c.name))],[customCats]);
+
+  // Bu ay aktif tekrarlayan giderleri hesapla
+  const activeRecurring=useMemo(()=>{
+    return recurringExp.filter(r=>{
+      const start=new Date(r.startDate);
+      const startMonth=start.getFullYear()*12+start.getMonth();
+      const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
+      const elapsed=nowMonth-startMonth;
+      return elapsed>=0&&elapsed<r.totalMonths;
+    });
+  },[recurringExp]);
+
+  // Tekrarlayan giderleri bu aya ekle (gider listesine sanal olarak)
+  const allExpenses=useMemo(()=>{
+    const synth=activeRecurring.map(r=>({
+      id:`rec_${r.id}`,
+      category:r.category,
+      amount:r.amount,
+      date:`${curMonth}-${String(r.dayOfMonth).padStart(2,'0')}`,
+      icon:r.icon,
+      payMethod:r.payMethod,
+      cardId:r.cardId,
+      installments:1,
+      isRecurring:true,
+      recurringId:r.id,
+      note:r.note,
+    }));
+    return [...expenses,...synth];
+  },[expenses,activeRecurring,curMonth]);
+
+  // Sabit gider kaydet
+  function saveRecurring(){
+    if(!rForm.category||!rForm.amount)return;
+    const data={...rForm,amount:Number(rForm.amount),dayOfMonth:Number(rForm.dayOfMonth)||1,totalMonths:Number(rForm.totalMonths)||12,cardId:rForm.cardId?Number(rForm.cardId):null};
+    if(editRecurringId){setRecurringExp(p=>p.map(r=>r.id===editRecurringId?{...r,...data}:r));setEditRecurringId(null);}
+    else{setRecurringExp(p=>[...p,{id:Date.now(),...data}]);}
+    // Kategoriye ekle
+    if(!CATS.find(c=>c.name===rForm.category)){setCustomCats(p=>[...p,{name:rForm.category,icon:rForm.icon}]);}
+    setRForm(blankRecurring);setShowAddRecurring(false);
+  }
+  function deleteRecurring(id){if(window.confirm("Sabit gideri sil?"))setRecurringExp(p=>p.filter(r=>r.id!==id));}
+
+  function saveCustomCat(){
+    if(!catForm.name)return;
+    setCustomCats(p=>[...p,{name:catForm.name,icon:catForm.icon||"📌"}]);
+    setCatForm({name:"",icon:"📌"});setShowAddCat(false);
+  }
+
+  // Aylık AI Raporu
+  async function getMonthlyReport(){
+    setReportLoading(true);setMonthlyReport(null);
+    const prevMonth=new Date(new Date().setMonth(new Date().getMonth()-1));
+    const prevKey=`${prevMonth.getFullYear()}-${String(prevMonth.getMonth()+1).padStart(2,'0')}`;
+    const prevExpenses=allExpenses.filter(e=>e.date.slice(0,7)===prevKey);
+    const prevTotal=prevExpenses.reduce((s,e)=>s+e.amount,0);
+    const prevCats={};prevExpenses.forEach(e=>{prevCats[e.category]=(prevCats[e.category]||0)+e.amount;});
+    const curExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth);
+    const curTotal=curExpenses.reduce((s,e)=>s+e.amount,0);
+    const recurTotalPrev=activeRecurring.reduce((s,r)=>s+r.amount,0);
+
+    const prompt=`Sen bir Türk kişisel finans danışmanısın. Aşağıdaki verilere göre kısa, net, yapıcı bir aylık finansal rapor hazırla.
+
+📅 RAPOR DÖNEMİ: ${MONTHS[prevMonth.getMonth()]} ${prevMonth.getFullYear()}
+
+GELİR:
+- Maaş: ${fmt(salary)}
+- Ek gelirler: ${fmt(thisMonthExtra)}
+- Toplam: ${fmt(totalIncome)}
+
+BORÇ ÖDEMELERİ: ${fmt(totalMonthly)} (gelirin %${debtRatio}'i)
+- ${debts.map(d=>`${d.name}: ${fmt(d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly)}`).join(', ')}
+
+GEÇTİĞİMİZ AY GİDERLER: ${fmt(prevTotal)}
+${Object.entries(prevCats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`- ${k}: ${fmt(v)}`).join('\n')}
+
+SABİT MASRAFLAR (aylık): ${fmt(recurTotalPrev)}
+${activeRecurring.map(r=>`- ${r.category}: ${fmt(r.amount)}`).join('\n')}
+
+BU AY GİDERLER (şimdiye kadar): ${fmt(curTotal)}
+
+NET KALAN GEÇEN AY: ${fmt(totalIncome-totalMonthly-prevTotal)}
+
+Raporda şunları içer:
+1. 📊 Genel değerlendirme (2 cümle)
+2. 💸 En yüksek 3 gider kalemi ve yorum
+3. ⚠️ Dikkat edilmesi gereken noktalar
+4. ✅ Olumlu gelişmeler
+5. 🎯 Gelecek ay için 3 somut öneri
+
+Türkçe, samimi, max 350 kelime. Rakamları kullan.`;
+
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
+      const d=await r.json();setMonthlyReport(d.content?.[0]?.text||"Yanıt alınamadı.");
+    }catch{setMonthlyReport("Bağlantı hatası.");}
+    setReportLoading(false);
+  }
   const thisMonthExtra=incomes.filter(e=>e.recurring||e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
   const totalIncome=salary+thisMonthExtra;
   const totalDebt=debts.reduce((s,d)=>s+d.remaining,0);
   const totalMonthly=debts.reduce((s,d)=>s+(d.type!=="kredi"&&d.userPayment?d.userPayment:d.monthly),0);
-  const totalExpenses=expenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
+  const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
   const freeIncome=totalIncome-totalMonthly-totalExpenses;
   const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
   const estLiving=totalExpenses>0?totalExpenses:Math.round(totalIncome*0.35);
@@ -325,6 +447,53 @@ function App(){
     setAiLoading(false);
   }
 
+  // Finansal bağlam özeti (her mesajda sisteme gönderilir)
+  function buildFinContext(){
+    return `[FİNANSAL DURUM ÖZETİ - ${new Date().toLocaleDateString('tr-TR')}]
+Gelir: ${fmt(totalIncome)} (Maaş: ${fmt(salary)}${thisMonthExtra>0?` + Ek: ${fmt(thisMonthExtra)}`:""}))
+Toplam Borç: ${fmt(totalDebt)} | Aylık Ödeme: ${fmt(totalMonthly)} (%${debtRatio} gelir)
+Bu Ay Gider: ${fmt(totalExpenses)} | Net Kalan: ${fmt(freeIncome)}
+Borçlar:
+${debts.map(d=>`  • ${d.name} [${d.type==="kredi"?"Kredi":d.type==="kredi_karti"?"K.Kartı":"KMH"}]: ${fmt(d.remaining)} kalan, %${d.rate} faiz, aylık ${fmt(d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly)}${d.months?`, ${d.months} ay`:""}`).join("\n")}
+${activeRecurring.length>0?`Sabit Giderler: ${activeRecurring.map(r=>`${r.category} ${fmt(r.amount)}`).join(", ")}`:""}`; 
+  }
+
+  async function sendChat(){
+    const msg=chatInput.trim();
+    if(!msg||chatLoading)return;
+    setChatInput("");
+    const userMsg={role:"user",content:msg,time:new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})};
+    const newMessages=[...chatMessages,userMsg];
+    setChatMessages(newMessages);
+    setChatLoading(true);
+    setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
+
+    // Sisteme finansal bağlamı ver, sohbet geçmişini gönder
+    const systemPrompt=`Sen samimi, yardımsever bir Türk kişisel finans danışmanısın. Kullanıcının finansal verilerine erişimin var. Kısa, net, uygulanabilir öneriler ver. Gereksiz tekrar yapma. Türkçe konuş.\n\n${buildFinContext()}`;
+
+    const apiMessages=newMessages.map(m=>({role:m.role,content:m.content}));
+
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:800,
+          system:systemPrompt,
+          messages:apiMessages
+        })
+      });
+      const d=await r.json();
+      const reply=d.content?.[0]?.text||"Yanıt alınamadı.";
+      setChatMessages(prev=>[...prev,{role:"assistant",content:reply,time:new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}]);
+    }catch{
+      setChatMessages(prev=>[...prev,{role:"assistant",content:"Bağlantı hatası, tekrar dene.",time:""}]);
+    }
+    setChatLoading(false);
+    setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
+  }
+
   // ── EXCEL EXPORT ──────────────────────────────────────────────────────────
   function exportExcel(){
     const wb=XLSX.utils.book_new();
@@ -376,7 +545,7 @@ function App(){
 
   const pieData=debts.map(d=>({name:d.name,value:d.remaining}));
   const chartData=Array.from({length:6},(_,i)=>{const m=new Date(2026,2+i,1);return{label:MONTHS[m.getMonth()].slice(0,3),value:Math.max(0,Math.round((totalDebt-totalMonthly*(i+1)*1.05)/1000))};});
-  const catData=CATS.map(c=>({name:c.name,tutar:expenses.filter(e=>e.category===c.name).reduce((s,e)=>s+e.amount,0)})).filter(c=>c.tutar>0);
+  const catData=CATS.map(c=>({name:c.name,tutar:allExpenses.filter(e=>e.category===c.name).reduce((s,e)=>s+e.amount,0)})).filter(c=>c.tutar>0);
 
   // ── RENDER ───────────────────────────────────────────────────────────────
   return <>
@@ -445,6 +614,7 @@ function App(){
         <Tab label="💸 Giderler" active={tab==="giderler"} onClick={()=>setTab("giderler")}/>
         <Tab label="💡 Öneri"    active={tab==="oneri"}    onClick={()=>setTab("oneri")}/>
         <Tab label="📅 Plan"     active={tab==="plan"}     onClick={()=>setTab("plan")}/>
+        <Tab label="📋 Rapor"    active={tab==="rapor"}    onClick={()=>setTab("rapor")}/>
         <Tab label="🤖 AI"       active={tab==="ai"}       onClick={()=>setTab("ai")}/>
       </div>
 
@@ -695,8 +865,123 @@ function App(){
         {tab==="giderler"&&<>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontSize:13,color:"#666"}}>Bu ay: <strong style={{color:"#1a1a2e"}}>{fmt(totalExpenses)}</strong></div>
-            <button onClick={()=>setShowAddExp(!showAddExp)} style={{...btnP,width:"auto",padding:"7px 13px",fontSize:12}}>+ Gider Ekle</button>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={()=>setShowAddRecurring(!showAddRecurring)} style={{...btnS("#8e44ad"),width:"auto",padding:"7px 10px",fontSize:11}}>🔄 Sabit</button>
+              <button onClick={()=>setShowAddExp(!showAddExp)} style={{...btnP,width:"auto",padding:"7px 11px",fontSize:11}}>+ Ekle</button>
+            </div>
           </div>
+
+          {/* Özel kategori ekleme */}
+          {showAddCat&&<Card style={{border:"2px dashed #8e44ad"}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"#8e44ad"}}>📁 Yeni Kategori</div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <input style={{...inp,marginBottom:0,flex:1}} placeholder="Kategori adı (örn: Ev Kirası)" value={catForm.name} onChange={e=>setCatForm({...catForm,name:e.target.value})}/>
+              <select style={{...inp,marginBottom:0,width:70}} value={catForm.icon} onChange={e=>setCatForm({...catForm,icon:e.target.value})}>
+                {ICONS.map(i=><option key={i} value={i}>{i}</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveCustomCat} style={btnS("#8e44ad")}>Ekle</button>
+              <button onClick={()=>setShowAddCat(false)} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
+            </div>
+          </Card>}
+
+          {/* Sabit/Tekrarlayan gider formu */}
+          {showAddRecurring&&<Card style={{border:"2px dashed #8e44ad"}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#8e44ad"}}>{editRecurringId?"✏️ Sabit Gideri Düzenle":"🔄 Yeni Sabit/Tekrarlayan Gider"}</div>
+            <div style={{fontSize:11,color:"#888",marginBottom:8}}>Kira, abonelik, aidat gibi her ay otomatik eklenen giderler</div>
+
+            {/* Kategori seç veya yeni ekle */}
+            <div style={{display:"flex",gap:6,marginBottom:8}}>
+              <select style={{...inp,marginBottom:0,flex:1}} value={rForm.category} onChange={e=>{
+                const cat=CATS.find(c=>c.name===e.target.value);
+                setRForm({...rForm,category:e.target.value,icon:cat?.icon||"📌"});
+              }}>
+                <option value="">Kategori seç...</option>
+                {CATS.map(c=><option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
+                <option value="__new__">+ Yeni kategori ekle</option>
+              </select>
+              <select style={{...inp,marginBottom:0,width:70}} value={rForm.icon} onChange={e=>setRForm({...rForm,icon:e.target.value})}>
+                {ICONS.map(i=><option key={i} value={i}>{i}</option>)}
+              </select>
+            </div>
+            {rForm.category==="__new__"&&<input style={inp} placeholder="Yeni kategori adı" value={rForm.customCatName||""} onChange={e=>setRForm({...rForm,customCatName:e.target.value,category:e.target.value})}/>}
+
+            <input style={inp} type="number" placeholder="Aylık tutar (₺)" value={rForm.amount} onChange={e=>setRForm({...rForm,amount:e.target.value})}/>
+            <div style={{display:"flex",gap:8}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:"#888",marginBottom:4}}>Her ayın kaçında?</div>
+                <input style={{...inp,marginBottom:0}} type="number" min="1" max="31" placeholder="Gün (1-31)" value={rForm.dayOfMonth} onChange={e=>setRForm({...rForm,dayOfMonth:e.target.value})}/>
+              </div>
+              <div style={{flex:1}}>
+                <div style={{fontSize:11,color:"#888",marginBottom:4}}>Başlangıç tarihi</div>
+                <input style={{...inp,marginBottom:0}} type="date" value={rForm.startDate} onChange={e=>setRForm({...rForm,startDate:e.target.value})}/>
+              </div>
+            </div>
+            <div style={{marginTop:8,marginBottom:8}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:4}}>Kaç ay sürecek?</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                {[3,6,12,24,36,60].map(n=>(
+                  <button key={n} onClick={()=>setRForm({...rForm,totalMonths:n})} style={{padding:"6px 12px",border:`2px solid ${rForm.totalMonths===n?"#8e44ad":"#e0e0e0"}`,borderRadius:8,background:rForm.totalMonths===n?"#f3e8fd":"#fff",color:rForm.totalMonths===n?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                    {n} ay
+                  </button>
+                ))}
+                <input type="number" placeholder="Diğer" style={{...inp,marginBottom:0,width:70,fontSize:12}} value={[3,6,12,24,36,60].includes(rForm.totalMonths)?"":(rForm.totalMonths||"")} onChange={e=>setRForm({...rForm,totalMonths:Number(e.target.value)})}/>
+              </div>
+              {rForm.amount&&rForm.totalMonths&&<div style={{marginTop:6,fontSize:11,color:"#8e44ad",fontWeight:600}}>
+                Toplam: {fmt(Number(rForm.amount)*Number(rForm.totalMonths))} ({rForm.totalMonths} ay × {fmt(Number(rForm.amount))})
+              </div>}
+            </div>
+            <input style={inp} placeholder="Not (isteğe bağlı: örn. Yıllık kira sözleşmesi)" value={rForm.note} onChange={e=>setRForm({...rForm,note:e.target.value})}/>
+
+            <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>💳 Ödeme Yöntemi</div>
+            <div style={{display:"flex",gap:6,marginBottom:8}}>
+              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setRForm({...rForm,payMethod:v,cardId:""})} style={{flex:1,padding:"7px",border:`2px solid ${rForm.payMethod===v?"#8e44ad":"#e0e0e0"}`,borderRadius:10,background:rForm.payMethod===v?"#f3e8fd":"#fff",color:rForm.payMethod===v?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>{l}</button>
+              ))}
+            </div>
+            {rForm.payMethod==="kredi_karti"&&<select style={inp} value={rForm.cardId} onChange={e=>setRForm({...rForm,cardId:e.target.value})}>
+              <option value="">Kart seç...</option>
+              {creditCards.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>}
+
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveRecurring} style={btnS("#8e44ad")}>{editRecurringId?"Güncelle":"Kaydet"}</button>
+              <button onClick={()=>{setShowAddRecurring(false);setEditRecurringId(null);setRForm(blankRecurring);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
+            </div>
+          </Card>}
+
+          {/* Aktif sabit giderler özeti */}
+          {activeRecurring.length>0&&<Card style={{border:"1px solid #e8d5f5"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div><div style={{fontSize:13,fontWeight:700,color:"#8e44ad"}}>🔄 Sabit Giderlerim</div>
+              <div style={{fontSize:10,color:"#aaa"}}>Bu ay otomatik eklendi</div></div>
+              <div style={{fontSize:14,fontWeight:800,color:"#8e44ad"}}>{fmt(activeRecurring.reduce((s,r)=>s+r.amount,0))}</div>
+            </div>
+            {recurringExp.map(r=>{
+              const start=new Date(r.startDate);
+              const startMonth=start.getFullYear()*12+start.getMonth();
+              const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
+              const elapsed=nowMonth-startMonth;
+              const remaining=r.totalMonths-elapsed;
+              const isActive=elapsed>=0&&elapsed<r.totalMonths;
+              return <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,marginBottom:6,background:isActive?"#f9f0ff":"#fafafa",border:isActive?"1px solid #d7bef5":"1px solid #eee",opacity:isActive?1:0.5}}>
+                <div style={{fontSize:20}}>{r.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:700}}>{r.category}</div>
+                  <div style={{fontSize:10,color:"#888"}}>Her ayın {r.dayOfMonth}. · {isActive?`${elapsed+1}/${r.totalMonths} ay · ${remaining} ay kaldı`:"Tamamlandı"}</div>
+                  {r.note&&<div style={{fontSize:10,color:"#b39ddb",fontStyle:"italic"}}>{r.note}</div>}
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(r.amount)}</div>
+                  <div style={{display:"flex",gap:4,marginTop:3}}>
+                    <button onClick={()=>{setRForm({category:r.category,icon:r.icon,amount:r.amount,dayOfMonth:r.dayOfMonth,startDate:r.startDate,totalMonths:r.totalMonths,payMethod:r.payMethod,cardId:r.cardId||"",note:r.note||""});setEditRecurringId(r.id);setShowAddRecurring(true);}} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>✏️</button>
+                    <button onClick={()=>deleteRecurring(r.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>🗑</button>
+                  </div>
+                </div>
+              </div>;
+            })}
+          </Card>}
 
           {showAddExp&&<Card style={{border:"2px dashed #e0e0e0"}}>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>{editExpId?"✏️ Gideri Düzenle":"➕ Yeni Gider"}</div>
@@ -743,27 +1028,32 @@ function App(){
           </Card>}
 
           {catData.length>0&&<Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>Kategorilere Göre</div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700}}>Kategorilere Göre</div>
+              <button onClick={()=>setShowAddCat(!showAddCat)} style={{fontSize:11,color:"#8e44ad",background:"#f3e8fd",border:"1px solid #d7bef5",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>+ Kategori</button>
+            </div>
             <BarChartH data={catData.map(c=>({label:c.name,value:c.tutar}))} color="#c0392b"/>
           </Card>}
 
-          {[...expenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
+          {[...allExpenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
             const card=e.cardId?debts.find(d=>d.id===e.cardId):null;
             const cat=CATS.find(c=>c.name===e.category);
-            return <Card key={e.id} style={{padding:"11px 13px"}}>
+            return <Card key={e.id} style={{padding:"11px 13px",border:e.isRecurring?"1px solid #e8d5f5":"none"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
                 <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                  <div style={{fontSize:22,marginTop:2}}>{cat?.icon||"📌"}</div>
+                  <div style={{fontSize:22,marginTop:2}}>{cat?.icon||e.icon||"📌"}</div>
                   <div>
                     <div style={{fontSize:13,fontWeight:600}}>{e.category}</div>
                     <div style={{fontSize:10,color:"#aaa"}}>{new Date(e.date).toLocaleDateString("tr-TR")}</div>
                     <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                      {e.isRecurring&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>🔄 Sabit</span>}
                       <span style={{fontSize:10,background:e.payMethod==="nakit"?"#e8f5e9":"#fff8e1",color:e.payMethod==="nakit"?"#2e7d32":"#e65100",borderRadius:20,padding:"1px 7px",fontWeight:600}}>
                         {e.payMethod==="nakit"?"💵 Nakit":"💳 Kart"}
                       </span>
                       {card&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{card.name.split(" ").slice(-1)[0]}</span>}
                       {e.installments>1&&<span style={{fontSize:10,background:"#e3f2fd",color:"#1565c0",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{e.installments} Taksit</span>}
                     </div>
+                    {e.note&&<div style={{fontSize:10,color:"#b39ddb",marginTop:2,fontStyle:"italic"}}>{e.note}</div>}
                   </div>
                 </div>
                 <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
@@ -771,10 +1061,10 @@ function App(){
                     <div style={{fontSize:14,fontWeight:800,color:"#1a1a2e"}}>{fmt(e.amount)}</div>
                     {e.installments>1&&e.installmentAmt&&<div style={{fontSize:10,color:"#888"}}>{fmt(e.installmentAmt)}/ay</div>}
                   </div>
-                  <div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>✏️</button>
+                  {!e.isRecurring&&<div style={{display:"flex",gap:5}}>
+                    <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️</button>
                     <button onClick={()=>deleteExp(e.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer"}}>🗑</button>
-                  </div>
+                  </div>}
                 </div>
               </div>
             </Card>;
@@ -922,27 +1212,215 @@ function App(){
           <button onClick={exportExcel} style={btnS("#27ae60")}>📊 Ödeme Planını Excel'e Aktar</button>
         </>}
 
-        {/* ══ AI ═══════════════════════════════════════════════════════════ */}
-        {tab==="ai"&&<>
-          <Card style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",color:"#fff"}}>
-            <div style={{fontSize:20,marginBottom:6}}>🤖</div>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:5}}>AI Finansal Danışman</div>
-            <div style={{fontSize:11,opacity:.7,marginBottom:14,lineHeight:1.6}}>Tüm verilerini analiz ederek kişiselleştirilmiş strateji üretir.</div>
-            <button onClick={getAI} disabled={aiLoading} style={{...btnP,background:"#c0392b",opacity:aiLoading?.7:1}}>{aiLoading?"⏳ Analiz ediliyor...":"🎯 Analiz Et & Öneri Al"}</button>
+        {/* ══ AYLIK RAPOR ══════════════════════════════════════════════════ */}
+        {tab==="rapor"&&<>
+          <Card style={{background:"linear-gradient(135deg,#1a237e,#283593)",color:"#fff",padding:"18px 16px"}}>
+            <div style={{fontSize:22,marginBottom:6}}>📋</div>
+            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Aylık Finansal Rapor</div>
+            <div style={{fontSize:11,opacity:.8,lineHeight:1.7,marginBottom:14}}>
+              Bir önceki aya ait tüm gelir, gider ve borç verilerini analiz ederek kişisel rapor oluşturur.
+            </div>
+            <button onClick={getMonthlyReport} disabled={reportLoading} style={{...btnP,background:"#3949ab",opacity:reportLoading?.7:1,fontSize:14,padding:"13px"}}>
+              {reportLoading?"⏳ Rapor hazırlanıyor...":"📊 Aylık Raporu Oluştur"}
+            </button>
           </Card>
-          {aiLoading&&<Card><div className="pulse" style={{textAlign:"center",padding:"20px",color:"#888",fontSize:13}}>Veriler analiz ediliyor...</div></Card>}
-          {aiAdvice&&<Card style={{border:"2px solid #f0e8ff"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#8e44ad"}}>📋 AI Önerileri</div>
-            <div style={{fontSize:13,lineHeight:1.85,color:"#333",whiteSpace:"pre-wrap"}}>{aiAdvice}</div>
-          </Card>}
-          <Card style={{background:"#fffbf0",border:"1px solid #ffe0b2"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#e65100",marginBottom:8}}>💡 Genel İpuçları</div>
-            {["Kredi kartı faizi en yüksek — ödeme tutarını artır","KMH'yı olabildiğince az kullan","Bir kredi kapanınca o taksiti diğer borca yönlendir","Ekstra geliri önce yüksek faizli borca öde","Hesap kesim tarihinden önce harcama yapma — sonraki döneme atar"].map((t,i)=>(
-              <div key={i} style={{fontSize:12,color:"#555",padding:"5px 0",display:"flex",gap:8,borderBottom:"1px solid #fff3e0"}}>
-                <span style={{color:"#e65100"}}>✓</span><span>{t}</span>
+
+          {/* Hızlı Özet Kartları */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
+            {[
+              ["💰 Toplam Gelir",fmt(totalIncome),"#27ae60","#f0fff4"],
+              ["💸 Borç Ödemeleri",fmt(totalMonthly),"#e67e22","#fff8f0"],
+              ["🧾 Toplam Gider",fmt(totalExpenses),"#e74c3c","#fff5f5"],
+              ["✅ Net Kalan",fmt(freeIncome),freeIncome>=0?"#27ae60":"#e74c3c",freeIncome>=0?"#f0fff4":"#fff5f5"],
+            ].map(([l,v,c,bg])=>(
+              <div key={l} style={{background:bg,borderRadius:14,padding:"12px 13px",border:`1px solid ${c}22`}}>
+                <div style={{fontSize:10,color:"#888",marginBottom:4}}>{l}</div>
+                <div style={{fontSize:15,fontWeight:800,color:c}}>{v}</div>
               </div>
             ))}
+          </div>
+
+          {/* Sabit Giderler Özeti */}
+          {activeRecurring.length>0&&<Card style={{background:"#f9f0ff",border:"1px solid #d7bef5"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#8e44ad",marginBottom:10}}>🔄 Sabit Giderler Özeti</div>
+            {activeRecurring.map(r=>{
+              const start=new Date(r.startDate);
+              const startMonth=start.getFullYear()*12+start.getMonth();
+              const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
+              const elapsed=nowMonth-startMonth+1;
+              const remaining=r.totalMonths-elapsed+1;
+              return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #e8d5f5"}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600}}>{r.icon} {r.category}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>{elapsed}/{r.totalMonths} ay ödendi · {remaining} ay kaldı</div>
+                  <div style={{background:"#e8d5f5",borderRadius:99,height:4,width:120,marginTop:3,overflow:"hidden"}}>
+                    <div style={{width:`${(elapsed/r.totalMonths)*100}%`,height:"100%",background:"#8e44ad",borderRadius:99}}/>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(r.amount)}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>Kalan: {fmt(r.amount*remaining)}</div>
+                </div>
+              </div>;
+            })}
+            <div style={{marginTop:8,display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,color:"#8e44ad"}}>
+              <span>Aylık toplam sabit gider</span>
+              <span>{fmt(activeRecurring.reduce((s,r)=>s+r.amount,0))}</span>
+            </div>
+          </Card>}
+
+          {/* Kategori Dağılımı */}
+          {catData.length>0&&<Card>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>📊 Bu Ay Gider Dağılımı</div>
+            <BarChartH data={catData.map(c=>({label:c.name,value:c.tutar}))} color="#3949ab"/>
+            <div style={{marginTop:10,borderTop:"1px solid #f5f5f5",paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700}}>
+              <span style={{color:"#555"}}>Toplam</span>
+              <span style={{color:"#1a237e"}}>{fmt(totalExpenses)}</span>
+            </div>
+          </Card>}
+
+          {/* AI Rapor Sonucu */}
+          {reportLoading&&<Card><div className="pulse" style={{textAlign:"center",padding:"24px",color:"#888",fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:8}}>📊</div>
+            Veriler analiz ediliyor, rapor hazırlanıyor...
+          </div></Card>}
+
+          {monthlyReport&&<Card style={{border:"2px solid #c5cae9"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#1a237e"}}>📋 Aylık Rapor</div>
+              <span style={{fontSize:10,background:"#e8eaf6",color:"#3949ab",borderRadius:20,padding:"3px 10px",fontWeight:600}}>
+                {MONTHS[new Date().getMonth()-1<0?11:new Date().getMonth()-1]} {new Date().getMonth()===0?new Date().getFullYear()-1:new Date().getFullYear()}
+              </span>
+            </div>
+            <div style={{fontSize:13,lineHeight:1.9,color:"#333",whiteSpace:"pre-wrap"}}>{monthlyReport}</div>
+            <button onClick={()=>{
+              const el=document.createElement('a');
+              el.href='data:text/plain;charset=utf-8,'+encodeURIComponent(monthlyReport);
+              el.download=`Finans_Rapor_${curMonth}.txt`;el.click();
+            }} style={{...btnS("#3949ab"),marginTop:12,fontSize:12,padding:"10px"}}>💾 Raporu İndir</button>
+          </Card>}
+
+          {!monthlyReport&&!reportLoading&&<Card style={{background:"#f8f9ff",border:"1px solid #c5cae9"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#3949ab",marginBottom:8}}>💡 Rapor Neler İçerir?</div>
+            {["Geçen aya ait gelir-gider analizi","En yüksek harcama kalemleri ve yorum","Borç ödeme durumu değerlendirmesi","Dikkat edilmesi gereken noktalar","Gelecek ay için somut öneriler"].map((t,i)=>(
+              <div key={i} style={{fontSize:12,color:"#555",padding:"5px 0",display:"flex",gap:8,borderBottom:"1px solid #e8eaf6"}}>
+                <span style={{color:"#3949ab"}}>✓</span><span>{t}</span>
+              </div>
+            ))}
+          </Card>}
+        </>}
+
+        {/* ══ AI ═══════════════════════════════════════════════════════════ */}
+        {tab==="ai"&&<>
+          {/* Sohbet başlık */}
+          <Card style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",color:"#fff",padding:"14px 16px",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🤖</div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800}}>Finans Asistanın</div>
+                  <div style={{fontSize:10,opacity:.65,display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{width:6,height:6,borderRadius:"50%",background:"#2ecc71"}}/>
+                    Finansal verilerini biliyor · Her an sohbet et
+                  </div>
+                </div>
+              </div>
+              {chatMessages.length>0&&<button onClick={()=>setChatMessages([])} style={{background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>🗑 Temizle</button>}
+            </div>
           </Card>
+
+          {/* Hızlı soru önerileri */}
+          {chatMessages.length===0&&<div style={{marginBottom:10}}>
+            <div style={{fontSize:11,color:"#888",marginBottom:8,paddingLeft:2}}>💡 Hızlı sorular:</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {[
+                "Hangi borcumu önce kapatmalıyım?",
+                "Bu ay ne kadar tasarruf edebilirim?",
+                "Kredi kartı borcumu ne zaman bitirebilirim?",
+                "Finansal durumumu değerlendirir misin?",
+                "Aylık bütçe nasıl ayarlamalıyım?",
+                "Acil fon oluşturmak için önerir misin?",
+              ].map((q,i)=>(
+                <button key={i} onClick={()=>{setChatInput(q);setTimeout(()=>chatInputRef.current?.focus(),50);}} style={{background:"#fff",border:"1.5px solid #e0e0e0",borderRadius:20,padding:"6px 12px",fontSize:11,color:"#444",cursor:"pointer",fontFamily:"'Sora',sans-serif",transition:"all .15s"}}
+                  onMouseOver={e=>e.target.style.borderColor="#c0392b"}
+                  onMouseOut={e=>e.target.style.borderColor="#e0e0e0"}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>}
+
+          {/* Mesaj alanı */}
+          <div style={{background:"#fff",borderRadius:16,boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:10,overflow:"hidden"}}>
+            <div style={{maxHeight:420,overflowY:"auto",padding:"14px 13px",display:"flex",flexDirection:"column",gap:10,minHeight:chatMessages.length===0?120:0}}>
+              {chatMessages.length===0&&<div style={{textAlign:"center",padding:"20px 0",color:"#ccc"}}>
+                <div style={{fontSize:32,marginBottom:8}}>💬</div>
+                <div style={{fontSize:13}}>Finansal durumun hakkında sormak istediğin bir şey var mı?</div>
+              </div>}
+
+              {chatMessages.map((m,i)=>{
+                const isUser=m.role==="user";
+                return <div key={i} style={{display:"flex",flexDirection:isUser?"row-reverse":"row",gap:8,alignItems:"flex-end"}}>
+                  {!isUser&&<div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>🤖</div>}
+                  <div style={{maxWidth:"80%"}}>
+                    <div style={{
+                      padding:"10px 13px",
+                      borderRadius:isUser?"16px 16px 4px 16px":"16px 16px 16px 4px",
+                      background:isUser?"linear-gradient(135deg,#c0392b,#922b21)":"#f5f5f5",
+                      color:isUser?"#fff":"#333",
+                      fontSize:13,
+                      lineHeight:1.6,
+                      whiteSpace:"pre-wrap",
+                      wordBreak:"break-word",
+                    }}>{m.content}</div>
+                    {m.time&&<div style={{fontSize:9,color:"#bbb",marginTop:3,textAlign:isUser?"right":"left",paddingLeft:isUser?0:4}}>{m.time}</div>}
+                  </div>
+                </div>;
+              })}
+
+              {chatLoading&&<div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
+                <div style={{padding:"10px 14px",background:"#f5f5f5",borderRadius:"16px 16px 16px 4px"}}>
+                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                    {[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:"#bbb",animation:`pu 1.2s ${i*0.2}s infinite`}}/>)}
+                  </div>
+                </div>
+              </div>}
+              <div ref={chatEndRef}/>
+            </div>
+
+            {/* Giriş alanı */}
+            <div style={{borderTop:"1px solid #f0f0f0",padding:"10px 12px",display:"flex",gap:8,alignItems:"flex-end"}}>
+              <textarea
+                ref={chatInputRef}
+                value={chatInput}
+                onChange={e=>setChatInput(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();}}}
+                placeholder="Sor... (Enter ile gönder, Shift+Enter yeni satır)"
+                rows={1}
+                style={{flex:1,border:"1.5px solid #e8ecf0",borderRadius:12,padding:"10px 12px",fontSize:13,fontFamily:"'Sora',sans-serif",outline:"none",resize:"none",lineHeight:1.5,maxHeight:100,overflowY:"auto",boxSizing:"border-box"}}
+                onInput={e=>{e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,100)+"px";}}
+              />
+              <button onClick={sendChat} disabled={chatLoading||!chatInput.trim()} style={{width:42,height:42,borderRadius:"50%",background:chatInput.trim()?"linear-gradient(135deg,#c0392b,#922b21)":"#eee",border:"none",color:chatInput.trim()?"#fff":"#bbb",fontSize:18,cursor:chatInput.trim()?"pointer":"default",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
+                ➤
+              </button>
+            </div>
+          </div>
+
+          {/* Finansal özet chip'leri */}
+          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
+            {[
+              [`💰 ${fmt(totalIncome)}`,"Gelir"],
+              [`💸 ${fmt(totalMonthly)}`,"Borç öd."],
+              [`📊 %${debtRatio}`,"Borç/Gelir"],
+              [`✅ ${fmt(freeIncome)}`,"Net kalan"],
+            ].map(([v,l])=>(
+              <div key={l} style={{background:"#fff",borderRadius:20,padding:"5px 12px",fontSize:11,boxShadow:"0 1px 6px rgba(0,0,0,.06)",display:"flex",gap:5,alignItems:"center"}}>
+                <span style={{fontWeight:700,color:"#1a1a2e"}}>{v}</span>
+                <span style={{color:"#aaa"}}>{l}</span>
+              </div>
+            ))}
+          </div>
         </>}
 
       </div>
