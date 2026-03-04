@@ -215,6 +215,7 @@ function App(){
 
   const blankExp={category:"Market",amount:"",date:new Date().toISOString().slice(0,10),payMethod:"nakit",cardId:"",installments:1};
   const [eForm,setEForm]=useState(blankExp);
+  const [editExpId,setEditExpId]=useState(null);
 
   const [iForm,setIForm]=useState({label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:false});
 
@@ -280,9 +281,20 @@ function App(){
   function saveExpense(){
     if(!eForm.amount||!eForm.category)return;
     const cat=CATS.find(c=>c.name===eForm.category);
-    setExpenses(p=>[...p,{id:Date.now(),...eForm,amount:Number(eForm.amount),icon:cat?.icon||"📌",cardId:eForm.cardId?Number(eForm.cardId):null,installments:Number(eForm.installments)||1}]);
+    const updated={...eForm,amount:Number(eForm.amount),icon:cat?.icon||"📌",cardId:eForm.cardId?Number(eForm.cardId):null,installments:Number(eForm.installments)||1};
+    if(editExpId){
+      setExpenses(p=>p.map(e=>e.id===editExpId?{...e,...updated}:e));
+      setEditExpId(null);
+    } else {
+      setExpenses(p=>[...p,{id:Date.now(),...updated}]);
+    }
     setEForm(blankExp);setShowAddExp(false);
   }
+  function startEditExp(e){
+    setEForm({category:e.category,amount:e.amount,date:e.date,payMethod:e.payMethod,cardId:e.cardId||"",installments:e.installments||1});
+    setEditExpId(e.id);setShowAddExp(true);window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function deleteExp(id){if(window.confirm("Bu gideri silmek istiyor musun?"))setExpenses(p=>p.filter(e=>e.id!==id));}
 
   function savePurchase(){
     if(!pForm.cardId||!pForm.amount)return;
@@ -687,7 +699,7 @@ function App(){
           </div>
 
           {showAddExp&&<Card style={{border:"2px dashed #e0e0e0"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>Yeni Gider</div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>{editExpId?"✏️ Gideri Düzenle":"➕ Yeni Gider"}</div>
             <select style={inp} value={eForm.category} onChange={e=>setEForm({...eForm,category:e.target.value})}>
               {CATS.map(c=><option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
             </select>
@@ -725,8 +737,8 @@ function App(){
               </div>
             </>}
             <div style={{marginTop:8,display:"flex",gap:8}}>
-              <button onClick={saveExpense} style={btnP}>Kaydet</button>
-              <button onClick={()=>setShowAddExp(false)} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
+              <button onClick={saveExpense} style={btnP}>{editExpId?"Güncelle":"Kaydet"}</button>
+              <button onClick={()=>{setShowAddExp(false);setEditExpId(null);setEForm(blankExp);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
             </div>
           </Card>}
 
@@ -754,9 +766,15 @@ function App(){
                     </div>
                   </div>
                 </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:14,fontWeight:800,color:"#1a1a2e"}}>{fmt(e.amount)}</div>
-                  {e.installments>1&&e.installmentAmt&&<div style={{fontSize:10,color:"#888"}}>{fmt(e.installmentAmt)}/ay</div>}
+                <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                  <div>
+                    <div style={{fontSize:14,fontWeight:800,color:"#1a1a2e"}}>{fmt(e.amount)}</div>
+                    {e.installments>1&&e.installmentAmt&&<div style={{fontSize:10,color:"#888"}}>{fmt(e.installmentAmt)}/ay</div>}
+                  </div>
+                  <div style={{display:"flex",gap:5}}>
+                    <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>✏️</button>
+                    <button onClick={()=>deleteExp(e.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer"}}>🗑</button>
+                  </div>
                 </div>
               </div>
             </Card>;
