@@ -229,6 +229,8 @@ function App(){
   const [showAddDebt,setShowAddDebt]=useState(false);
   const [showAddExp,setShowAddExp]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState(new Date().toISOString().slice(0,7));
+  const [showQuickExp,setShowQuickExp]=useState(false);
+  const [quickForm,setQuickForm]=useState({category:"Market",amount:"",payMethod:"kredi_karti",cardId:"",note:""});
   const [showAddIncome,setShowAddIncome]=useState(false);
   const [showPurchase,setShowPurchase]=useState(false);
   const [showAddRecurring,setShowAddRecurring]=useState(false);
@@ -391,6 +393,23 @@ function App(){
 
   function updateUserPayment(id,val){setDebts(p=>p.map(d=>d.id===id?{...d,userPayment:Math.max(0,Number(val))}:d));}
 
+  function saveQuickExp(){
+    if(!quickForm.amount||!quickForm.category)return;
+    const cat=CATS.find(c=>c.name===quickForm.category);
+    const today=new Date().toISOString().slice(0,10);
+    const newExp={id:Date.now(),category:quickForm.category,amount:Number(quickForm.amount),
+      date:today,icon:cat?.icon||"📌",payMethod:quickForm.payMethod,
+      cardId:quickForm.cardId?Number(quickForm.cardId):null,installments:1,
+      note:quickForm.note||""};
+    // Kart ile yapıldıysa kart borcuna da ekle
+    if(quickForm.payMethod==="kredi_karti"&&quickForm.cardId){
+      setDebts(p=>p.map(d=>d.id===Number(quickForm.cardId)?{...d,remaining:d.remaining+Number(quickForm.amount)}:d));
+    }
+    setExpenses(p=>[...p,newExp]);
+    setQuickForm(prev=>({...prev,amount:"",note:""}));
+    setShowQuickExp(false);
+  }
+
   function applySmart(){
     setDebts(p=>p.map(d=>{const s=smart.payments.find(x=>x.id===d.id);return s?{...d,userPayment:s.suggested}:d;}));
     setSuggApplied(true);setTab("plan");
@@ -476,10 +495,81 @@ function App(){
             <div style={{fontSize:11,opacity:.65,marginBottom:2}}>Hoş geldin 👋</div>
             <div style={{fontSize:17,fontWeight:800}}>Finans Takibim</div>
           </div>
-          <button onClick={exportExcel} style={{background:"rgba(255,255,255,.18)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
-            📊 Excel'e Aktar
-          </button>
+          <div style={{display:"flex",gap:6}}>
+            <button onClick={()=>setShowQuickExp(true)} style={{background:"rgba(255,255,255,.22)",border:"1px solid rgba(255,255,255,.4)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:13,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
+              ⚡ Harcama
+            </button>
+            <button onClick={exportExcel} style={{background:"rgba(255,255,255,.18)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
+              📊 Excel
+            </button>
+          </div>
         </div>
+
+        {/* ── HIZLI GİDER MODAL ──────────────────────────────────────────── */}
+        {showQuickExp&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowQuickExp(false);}}>
+          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480,boxSizing:"border-box"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+              <div style={{fontSize:15,fontWeight:800,color:"#1a1a2e"}}>⚡ Hızlı Harcama Ekle</div>
+              <button onClick={()=>setShowQuickExp(false)} style={{background:"#f0f0f0",border:"none",borderRadius:"50%",width:28,height:28,fontSize:16,cursor:"pointer"}}>×</button>
+            </div>
+
+            {/* Kategori */}
+            <div style={{fontSize:11,color:"#888",marginBottom:4,fontWeight:600}}>Kategori</div>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}}>
+              {CATS.slice(0,8).map(c=>(
+                <button key={c.name} onClick={()=>setQuickForm({...quickForm,category:c.name})}
+                  style={{padding:"6px 11px",border:`2px solid ${quickForm.category===c.name?"#c0392b":"#e8ecf0"}`,borderRadius:20,background:quickForm.category===c.name?"#fdf0f0":"#fff",color:quickForm.category===c.name?"#c0392b":"#555",fontSize:12,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
+                  {c.icon} {c.name}
+                </button>
+              ))}
+              <select value={quickForm.category} onChange={e=>setQuickForm({...quickForm,category:e.target.value})}
+                style={{...inp,marginBottom:0,padding:"6px 10px",fontSize:12,height:36,flex:1,minWidth:100}}>
+                {CATS.map(c=><option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
+              </select>
+            </div>
+
+            {/* Tutar */}
+            <div style={{fontSize:11,color:"#888",marginBottom:4,fontWeight:600}}>Tutar</div>
+            <input autoFocus type="number" placeholder="0 ₺" value={quickForm.amount}
+              onChange={e=>setQuickForm({...quickForm,amount:e.target.value})}
+              style={{...inp,fontSize:22,fontWeight:800,textAlign:"center",marginBottom:12,padding:"14px"}}/>
+
+            {/* Ödeme yöntemi */}
+            <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>Ödeme Yöntemi</div>
+            <div style={{display:"flex",gap:6,marginBottom:10}}>
+              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setQuickForm({...quickForm,payMethod:v,cardId:""})}
+                  style={{flex:1,padding:"10px",border:`2px solid ${quickForm.payMethod===v?"#c0392b":"#e0e0e0"}`,borderRadius:12,background:quickForm.payMethod===v?"#fdf0f0":"#fff",color:quickForm.payMethod===v?"#c0392b":"#555",fontSize:13,fontWeight:700,cursor:"pointer"}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {/* Kart seçimi */}
+            {quickForm.payMethod==="kredi_karti"&&<>
+              <div style={{fontSize:11,color:"#888",marginBottom:4,fontWeight:600}}>Hangi Kart?</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                {creditCards.map(c=>(
+                  <button key={c.id} onClick={()=>setQuickForm({...quickForm,cardId:String(c.id)})}
+                    style={{padding:"7px 12px",border:`2px solid ${quickForm.cardId===String(c.id)?"#8e44ad":"#e0e0e0"}`,borderRadius:20,background:quickForm.cardId===String(c.id)?"#f3e8fd":"#fff",color:quickForm.cardId===String(c.id)?"#8e44ad":"#555",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
+                    💳 {c.name.replace("K.Kartı - ","").replace("K.Kartı- ","")}
+                  </button>
+                ))}
+              </div>
+            </>}
+
+            {/* Not */}
+            <input placeholder="Not (isteğe bağlı)" value={quickForm.note}
+              onChange={e=>setQuickForm({...quickForm,note:e.target.value})}
+              style={{...inp,marginBottom:14,fontSize:13}}/>
+
+            <button onClick={saveQuickExp}
+              disabled={!quickForm.amount||!quickForm.category||(quickForm.payMethod==="kredi_karti"&&!quickForm.cardId)}
+              style={{...btnP,fontSize:15,padding:"14px",opacity:(!quickForm.amount||(quickForm.payMethod==="kredi_karti"&&!quickForm.cardId))?.5:1}}>
+              ✅ Kaydet
+            </button>
+          </div>
+        </div>}
 
         {/* Kart uyarıları */}
         {cardAlerts.map(a=>(
@@ -654,9 +744,28 @@ function App(){
         {tab==="borclar"&&<>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
             <div style={{fontSize:13,color:"#666"}}>Toplam: <strong style={{color:"#1a1a2e"}}>{fmt(totalDebt)}</strong></div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{setShowPurchase(true);}} style={{...btnS("#e67e22"),width:"auto",padding:"7px 12px",fontSize:11}}>🛒 Alışveriş</button>
-              <button onClick={()=>{setEditDebtId(null);setDForm(blankDebt);setShowAddDebt(!showAddDebt);}} style={{...btnP,width:"auto",padding:"7px 13px",fontSize:12}}>+ Borç Ekle</button>
+            <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
+              <button onClick={()=>{
+                // Tüm nakiti borçlara dağıt — her esnek borca %20 min, kalanı Avalanche
+                const flexD=debts.filter(d=>d.type!=="kredi");
+                const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
+                const expTotal=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
+                const available=Math.max(0,totalIncome-fixedTotal-expTotal);
+                if(available<=0){alert("Dağıtılacak gelir yok.");return;}
+                // Önce %20 min ata
+                let rem=available;
+                const newPays={};
+                const sorted=[...flexD].sort((a,b)=>b.rate-a.rate);
+                sorted.forEach(d=>{const min=Math.ceil(d.remaining*0.20);newPays[d.id]=min;rem-=min;});
+                // Kalanı Avalanche — en yüksek faize
+                for(let i=0;i<sorted.length&&rem>0;i++){
+                  const add=Math.min(rem,sorted[i].remaining-newPays[sorted[i].id]);
+                  if(add>0){newPays[sorted[i].id]+=Math.round(add);rem-=Math.round(add);}
+                }
+                setDebts(p=>p.map(d=>newPays[d.id]!==undefined?{...d,userPayment:newPays[d.id]}:d));
+              }} style={{...btnS("#27ae60"),width:"auto",padding:"7px 10px",fontSize:11}}>⚡ Nakiti Dağıt</button>
+              <button onClick={()=>{setShowPurchase(true);}} style={{...btnS("#e67e22"),width:"auto",padding:"7px 10px",fontSize:11}}>🛒 Harcama</button>
+              <button onClick={()=>{setEditDebtId(null);setDForm(blankDebt);setShowAddDebt(!showAddDebt);}} style={{...btnP,width:"auto",padding:"7px 11px",fontSize:11}}>+ Ekle</button>
             </div>
           </div>
 
@@ -722,43 +831,143 @@ function App(){
             </div>
           </Card>}
 
+          {/* ── Akıllı Dağılım Özet Kartı ─────────────────────────────── */}
+          {(()=>{
+            const flexDebts=debts.filter(d=>d.type!=="kredi");
+            const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
+            const minTotal=flexDebts.reduce((s,d)=>s+Math.ceil(d.remaining*0.20),0);
+            const expTotal=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
+            const available=Math.max(0,totalIncome-fixedTotal-expTotal);
+            const extraForDebts=Math.max(0,available-minTotal);
+            return <Card style={{background:"linear-gradient(135deg,#1b2a4a,#c0392b)",color:"#fff",padding:"14px 16px",marginBottom:4}}>
+              <div style={{fontSize:12,fontWeight:700,marginBottom:8,opacity:.85}}>💡 Bu Ay Borç Ödeme Durumu</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                {[
+                  ["Toplam Gelir",fmt(totalIncome)],
+                  ["Sabit Kredi",`-${fmt(fixedTotal)}`],
+                  ["Giderler",`-${fmt(expTotal)}`],
+                  ["Borçlara Kalan",fmt(available)],
+                ].map(([l,v])=><div key={l} style={{background:"rgba(255,255,255,.12)",borderRadius:10,padding:"8px 10px"}}>
+                  <div style={{fontSize:9,opacity:.7}}>{l}</div>
+                  <div style={{fontSize:13,fontWeight:800}}>{v}</div>
+                </div>)}
+              </div>
+              <div style={{background:"rgba(255,255,255,.15)",borderRadius:10,padding:"8px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <div style={{fontSize:10,opacity:.75}}>Min. ödemeler (%20)</div>
+                  <div style={{fontSize:14,fontWeight:800}}>{fmt(minTotal)}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:10,opacity:.75}}>Ekstra borç ödeme</div>
+                  <div style={{fontSize:14,fontWeight:800,color:extraForDebts>0?"#a8f0c6":"#ff9090"}}>{fmt(extraForDebts)}</div>
+                </div>
+              </div>
+            </Card>;
+          })()}
+
           {debts.map((d,i)=>{
             const isFlx=d.type!=="kredi";
             const pl=isFlx?buildFlexPlan(d):buildFixedPlan(d);
             const pct=Math.round((1-d.remaining/d.total)*100);
-            return <Card key={d.id}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+            const minPay=isFlx?Math.ceil(d.remaining*0.20):d.monthly;
+            const interest=Math.ceil(d.remaining*(d.rate/100));
+            const smartP=smart.payments.find(p=>p.id===d.id);
+
+            // Son ödeme tarihi hesapla
+            const today2=new Date();
+            let sonOdemeTarih=null, kesimTarih=null, gunKaldi=null;
+            // Kredi kartı → sonOdemeGunu kullan; KMH → payDay kullan
+            const odemeGun=d.sonOdemeGunu||d.payDay;
+            if(odemeGun){
+              sonOdemeTarih=new Date(today2.getFullYear(),today2.getMonth(),odemeGun);
+              if(sonOdemeTarih<today2)sonOdemeTarih=new Date(today2.getFullYear(),today2.getMonth()+1,odemeGun);
+              gunKaldi=Math.ceil((sonOdemeTarih-today2)/(1000*60*60*24));
+            }
+            if(d.kesimGunu){
+              kesimTarih=new Date(today2.getFullYear(),today2.getMonth(),d.kesimGunu);
+              if(kesimTarih<today2)kesimTarih=new Date(today2.getFullYear(),today2.getMonth()+1,d.kesimGunu);
+            }
+            const acil=gunKaldi!==null&&gunKaldi<=5;
+            const yakin=gunKaldi!==null&&gunKaldi<=10&&!acil;
+
+            return <Card key={d.id} style={{border:acil?"2px solid #e74c3c":yakin?"2px solid #f39c12":"none"}}>
+              {/* Üst başlık */}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
                 <div>
                   <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:4}}>{d.name}</div>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                     <TBadge type={d.type}/>
                     <span style={{fontSize:10,background:isFlx?"#e8f5e9":"#e3f2fd",color:isFlx?"#2e7d32":"#1565c0",borderRadius:20,padding:"2px 8px",fontWeight:600}}>{isFlx?"Esnek":"Sabit"}</span>
-                    {d.type==="kredi_karti"&&d.sonOdemeGunu&&<span style={{fontSize:10,background:"#fff8e1",color:"#e65100",borderRadius:20,padding:"2px 8px",fontWeight:600}}>Son: {d.sonOdemeGunu}. gün</span>}
+                    {acil&&<span style={{fontSize:10,background:"#fde8e8",color:"#e74c3c",borderRadius:20,padding:"2px 8px",fontWeight:700}}>🚨 {gunKaldi===0?"BUGÜN":gunKaldi+" GÜN"}</span>}
+                    {yakin&&<span style={{fontSize:10,background:"#fef9e7",color:"#f39c12",borderRadius:20,padding:"2px 8px",fontWeight:700}}>⚡ {gunKaldi} gün</span>}
                   </div>
                 </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                  <div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:800,color:"#c0392b"}}>{fmt(d.remaining)}</div><div style={{fontSize:10,color:"#999"}}>kalan</div></div>
-                  <div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>startEdit(d)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>✏️ Düzenle</button>
+                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:5}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:15,fontWeight:800,color:"#c0392b"}}>{fmt(d.remaining)}</div>
+                    <div style={{fontSize:10,color:"#999"}}>kalan borç</div>
+                  </div>
+                  <div style={{display:"flex",gap:4}}>
+                    <button onClick={()=>startEdit(d)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"4px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️</button>
                     <button onClick={()=>deleteDebt(d.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"4px 8px",fontSize:11,cursor:"pointer"}}>🗑</button>
                   </div>
                 </div>
               </div>
-              <div style={{background:"#f5f5f5",borderRadius:99,height:5,overflow:"hidden",marginBottom:7}}>
+
+              {/* İlerleme çubuğu */}
+              <div style={{background:"#f5f5f5",borderRadius:99,height:5,overflow:"hidden",marginBottom:8}}>
                 <div style={{width:`${Math.max(pct,2)}%`,height:"100%",background:COLORS[i%COLORS.length],borderRadius:99}}/>
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#888",marginBottom:isFlx?10:0}}>
-                <span>%{d.rate} faiz</span>
-                <span>Aylık {fmt(isFlx?(d.userPayment||d.monthly):d.monthly)}</span>
-                <span>{pl.length} ay</span>
+
+              {/* Tarih & Faiz bilgileri */}
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:8}}>
+                <div style={{background:"#f8f9fa",borderRadius:8,padding:"6px 8px"}}>
+                  <div style={{fontSize:9,color:"#aaa",marginBottom:1}}>Aylık Faiz</div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#e67e22"}}>{fmt(interest)}</div>
+                </div>
+                <div style={{background:"#f8f9fa",borderRadius:8,padding:"6px 8px"}}>
+                  <div style={{fontSize:9,color:"#aaa",marginBottom:1}}>%{d.rate} · {pl.length} ay</div>
+                  <div style={{fontSize:12,fontWeight:700,color:"#555"}}>{pl.length>0?pl[pl.length-1]?.label:"-"}</div>
+                </div>
+                {kesimTarih&&<div style={{background:"#fff8e1",borderRadius:8,padding:"6px 8px"}}>
+                  <div style={{fontSize:9,color:"#aaa",marginBottom:1}}>📋 Hesap Kesim</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#e65100"}}>{kesimTarih.toLocaleDateString("tr-TR")}</div>
+                </div>}
+                {sonOdemeTarih&&<div style={{background:acil?"#fde8e8":yakin?"#fef9e7":"#f0fff4",borderRadius:8,padding:"6px 8px"}}>
+                  <div style={{fontSize:9,color:"#aaa",marginBottom:1}}>💳 Son Ödeme</div>
+                  <div style={{fontSize:11,fontWeight:700,color:acil?"#e74c3c":yakin?"#f39c12":"#27ae60"}}>{sonOdemeTarih.toLocaleDateString("tr-TR")}</div>
+                </div>}
               </div>
-              {isFlx&&<div style={{borderTop:"1px solid #f0f0f0",paddingTop:10,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:12,color:"#555",whiteSpace:"nowrap"}}>Aylık ödemen:</span>
-                <input type="number" value={d.userPayment||d.monthly} onChange={e=>updateUserPayment(d.id,e.target.value)} style={{...inp,marginBottom:0,flex:1,textAlign:"right",fontWeight:700,fontSize:13}}/>
-                <span style={{fontSize:12,color:"#aaa"}}>₺</span>
+
+              {/* Ödeme tutarı — sadece esnek borçlar */}
+              {isFlx&&<div style={{borderTop:"1px solid #f0f0f0",paddingTop:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <span style={{fontSize:11,color:"#555",fontWeight:600}}>Ödeme Tutarı</span>
+                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                    <span style={{fontSize:10,background:"#fde8e8",color:"#c0392b",borderRadius:20,padding:"2px 8px",fontWeight:600}}>Min: {fmt(minPay)}</span>
+                    {smartP&&<span style={{fontSize:10,background:"#e8f5e9",color:"#27ae60",borderRadius:20,padding:"2px 8px",fontWeight:600}}>Öneri: {fmt(smartP.suggested)}</span>}
+                  </div>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <input type="number" value={d.userPayment||minPay} onChange={e=>updateUserPayment(d.id,e.target.value)}
+                    style={{...inp,marginBottom:0,flex:1,textAlign:"right",fontWeight:800,fontSize:15,
+                      border:`2px solid ${(d.userPayment||0)<minPay?"#e74c3c":"#e8ecf0"}`,
+                      color:(d.userPayment||0)<minPay?"#e74c3c":"#1a1a2e"}}/>
+                  <span style={{fontSize:12,color:"#aaa",flexShrink:0}}>₺/ay</span>
+                  <button onClick={()=>updateUserPayment(d.id,minPay)} title="Min (%20) uygula"
+                    style={{background:"#fde8e8",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"6px 8px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0,whiteSpace:"nowrap"}}>%20</button>
+                  {smartP&&<button onClick={()=>updateUserPayment(d.id,smartP.suggested)} title="Öneriyi uygula"
+                    style={{background:"#e8f5e9",color:"#27ae60",border:"1px solid #b2dfdb",borderRadius:8,padding:"6px 8px",fontSize:11,cursor:"pointer",fontWeight:700,flexShrink:0}}>✓</button>}
+                </div>
+                {(d.userPayment||0)<minPay&&<div style={{fontSize:10,color:"#e74c3c",marginTop:4,fontWeight:600}}>
+                  ⚠️ Minimum %20 ödeme: {fmt(minPay)} — mevcut tutar yetersiz!
+                </div>}
               </div>}
-              {d.type==="kredi_karti"&&(d.kesimGunu||d.sonOdemeGunu)&&<div style={{marginTop:8,padding:"6px 8px",background:"#fff8e1",borderRadius:8,fontSize:11,color:"#e65100"}}>
-                {d.kesimGunu?`📋 Kesim: Ayın ${d.kesimGunu}. günü`:""}  {d.sonOdemeGunu?`💳 Son Ödeme: Ayın ${d.sonOdemeGunu}. günü`:""}
+
+              {/* Sabit kredi için ödeme bilgisi */}
+              {!isFlx&&<div style={{background:"#e3f2fd",borderRadius:8,padding:"8px 10px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:12,color:"#1565c0",fontWeight:600}}>Sabit Taksit</span>
+                <span style={{fontSize:14,fontWeight:800,color:"#1565c0"}}>{fmt(d.monthly)}</span>
               </div>}
             </Card>;
           })}
