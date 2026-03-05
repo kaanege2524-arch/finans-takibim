@@ -165,10 +165,23 @@ function calcSmart(debts,income,living){
   const available=Math.max(0,income-fixedTotal-living);
   const flex=[...debts.filter(d=>d.type!=="kredi")].sort((a,b)=>b.rate-a.rate);
   if(!flex.length||available<=0)return{payments:[],available,fixedTotal,living,surplus:0};
-  const payments=flex.map(d=>{const minPay=Math.ceil(d.remaining*(d.rate/100))+1;return{id:d.id,name:d.name,type:d.type,remaining:d.remaining,rate:d.rate,minPay,suggested:minPay};});
+  // %20 minimum ödeme zorunluluğu
+  const payments=flex.map(d=>{
+    const intOnly=Math.ceil(d.remaining*(d.rate/100));
+    const minByRate=intOnly+1;
+    const minByPct=Math.ceil(d.remaining*0.20);
+    const minPay=Math.max(minByRate,minByPct);
+    return{id:d.id,name:d.name,type:d.type,remaining:d.remaining,rate:d.rate,minPay,suggested:minPay};
+  });
   let extra=available-payments.reduce((s,p)=>s+p.minPay,0);
-  if(extra<0){payments.forEach(p=>{p.suggested=Math.max(p.minPay,Math.round(available*(p.remaining/flex.reduce((s,d)=>s+d.remaining,0))));});}
-  else{for(let i=0;i<payments.length&&extra>0;i++){const add=Math.min(extra,Math.max(0,payments[i].remaining*1.05-payments[i].suggested));payments[i].suggested+=Math.round(add);extra-=Math.round(add);}}
+  if(extra<0){
+    payments.forEach(p=>{p.suggested=Math.max(p.minPay,Math.round(available*(p.remaining/flex.reduce((s,d)=>s+d.remaining,0))));});
+  } else {
+    for(let i=0;i<payments.length&&extra>0;i++){
+      const add=Math.min(extra,Math.max(0,payments[i].remaining*1.05-payments[i].suggested));
+      payments[i].suggested+=Math.round(add);extra-=Math.round(add);
+    }
+  }
   payments.forEach(p=>{
     let rem=p.remaining;const rate=p.rate/100;let months=0;
     while(rem>0&&months<120){const int=rem*rate;const prin=Math.max(0,p.suggested-int);rem-=prin;months++;if(prin<=0)break;}
@@ -215,6 +228,7 @@ function App(){
   const [editDebtId,setEditDebtId]=useState(null);      // borç düzenleme
   const [showAddDebt,setShowAddDebt]=useState(false);
   const [showAddExp,setShowAddExp]=useState(false);
+  const [selectedMonth,setSelectedMonth]=useState(new Date().toISOString().slice(0,7));
   const [showAddIncome,setShowAddIncome]=useState(false);
   const [showPurchase,setShowPurchase]=useState(false);
   const [showAddRecurring,setShowAddRecurring]=useState(false);
@@ -752,11 +766,24 @@ function App(){
 
         {/* ══ GİDERLER ════════════════════════════════════════════════════ */}
         {tab==="giderler"&&<>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div style={{fontSize:13,color:"#666"}}>Bu ay: <strong style={{color:"#1a1a2e"}}>{fmt(totalExpenses)}</strong></div>
-            <div style={{display:"flex",gap:6}}>
-              <button onClick={()=>setShowAddRecurring(!showAddRecurring)} style={{...btnS("#8e44ad"),width:"auto",padding:"7px 10px",fontSize:11}}>🔄 Sabit</button>
-              <button onClick={()=>setShowAddExp(!showAddExp)} style={{...btnP,width:"auto",padding:"7px 11px",fontSize:11}}>+ Ekle</button>
+          {/* Ay seçici + özet */}
+          <div style={{background:"#fff",borderRadius:14,padding:"12px 14px",marginBottom:10,boxShadow:"0 2px 10px rgba(0,0,0,.05)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <button onClick={()=>{const d=new Date(selectedMonth+"-01");d.setMonth(d.getMonth()-1);setSelectedMonth(d.toISOString().slice(0,7));}} style={{background:"#f5f5f5",border:"none",borderRadius:8,width:28,height:28,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+                <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",minWidth:90,textAlign:"center"}}>
+                  {MONTHS[new Date(selectedMonth+"-01").getMonth()]} {new Date(selectedMonth+"-01").getFullYear()}
+                </div>
+                <button onClick={()=>{const d=new Date(selectedMonth+"-01");d.setMonth(d.getMonth()+1);setSelectedMonth(d.toISOString().slice(0,7));}} style={{background:"#f5f5f5",border:"none",borderRadius:8,width:28,height:28,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:11,color:"#aaa"}}>Toplam Gider</div>
+                <div style={{fontSize:16,fontWeight:800,color:"#c0392b"}}>{fmt(allExpenses.filter(e=>e.date.slice(0,7)===selectedMonth).reduce((s,e)=>s+e.amount,0))}</div>
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
+              <button onClick={()=>setShowAddRecurring(!showAddRecurring)} style={{...btnS("#8e44ad"),width:"auto",padding:"6px 10px",fontSize:11}}>🔄 Sabit</button>
+              <button onClick={()=>setShowAddExp(!showAddExp)} style={{...btnP,width:"auto",padding:"6px 11px",fontSize:11}}>+ Ekle</button>
             </div>
           </div>
 
@@ -916,48 +943,58 @@ function App(){
             </div>
           </Card>}
 
-          {catData.length>0&&<Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700}}>Kategorilere Göre</div>
-              <button onClick={()=>setShowAddCat(!showAddCat)} style={{fontSize:11,color:"#8e44ad",background:"#f3e8fd",border:"1px solid #d7bef5",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>+ Kategori</button>
-            </div>
-            <BarChartH data={catData.map(c=>({label:c.name,value:c.tutar}))} color="#c0392b"/>
-          </Card>}
-
-          {[...allExpenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
-            const card=e.cardId?debts.find(d=>d.id===e.cardId):null;
-            const cat=CATS.find(c=>c.name===e.category);
-            return <Card key={e.id} style={{padding:"11px 13px",border:e.isRecurring?"1px solid #e8d5f5":"none"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                  <div style={{fontSize:22,marginTop:2}}>{cat?.icon||e.icon||"📌"}</div>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:600}}>{e.category}</div>
-                    <div style={{fontSize:10,color:"#aaa"}}>{new Date(e.date).toLocaleDateString("tr-TR")}</div>
-                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                      {e.isRecurring&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>🔄 Sabit</span>}
-                      <span style={{fontSize:10,background:e.payMethod==="nakit"?"#e8f5e9":"#fff8e1",color:e.payMethod==="nakit"?"#2e7d32":"#e65100",borderRadius:20,padding:"1px 7px",fontWeight:600}}>
-                        {e.payMethod==="nakit"?"💵 Nakit":"💳 Kart"}
-                      </span>
-                      {card&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{card.name.split(" ").slice(-1)[0]}</span>}
-                      {e.installments>1&&<span style={{fontSize:10,background:"#e3f2fd",color:"#1565c0",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{e.installments} Taksit</span>}
+          {(() => {
+            const filteredExp = [...allExpenses].filter(e=>e.date.slice(0,7)===selectedMonth).sort((a,b)=>b.date.localeCompare(a.date));
+            const filteredCatData = CATS.map(c=>({name:c.name,tutar:filteredExp.filter(e=>e.category===c.name).reduce((s,e)=>s+e.amount,0)})).filter(c=>c.tutar>0);
+            return <>
+              {filteredCatData.length>0&&<Card>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                  <div style={{fontSize:13,fontWeight:700}}>Kategorilere Göre</div>
+                  <button onClick={()=>setShowAddCat(!showAddCat)} style={{fontSize:11,color:"#8e44ad",background:"#f3e8fd",border:"1px solid #d7bef5",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>+ Kategori</button>
+                </div>
+                <BarChartH data={filteredCatData.map(c=>({label:c.name,value:c.tutar}))} color="#c0392b"/>
+              </Card>}
+              {filteredExp.length===0&&<Card style={{textAlign:"center",padding:"24px",color:"#ccc"}}>
+                <div style={{fontSize:28,marginBottom:8}}>📭</div>
+                <div style={{fontSize:13}}>{MONTHS[new Date(selectedMonth+"-01").getMonth()]} ayına ait gider yok</div>
+                <div style={{fontSize:11,marginTop:4}}>+ Ekle butonu ile gider ekleyebilirsin</div>
+              </Card>}
+              {filteredExp.map(e=>{
+                const card=e.cardId?debts.find(d=>d.id===e.cardId):null;
+                const cat=CATS.find(c=>c.name===e.category);
+                return <Card key={e.id} style={{padding:"11px 13px",border:e.isRecurring?"1px solid #e8d5f5":"none"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                      <div style={{fontSize:22,marginTop:2}}>{cat?.icon||e.icon||"📌"}</div>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600}}>{e.category}</div>
+                        <div style={{fontSize:10,color:"#aaa"}}>{new Date(e.date).toLocaleDateString("tr-TR")}</div>
+                        <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
+                          {e.isRecurring&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>🔄 Sabit</span>}
+                          <span style={{fontSize:10,background:e.payMethod==="nakit"?"#e8f5e9":"#fff8e1",color:e.payMethod==="nakit"?"#2e7d32":"#e65100",borderRadius:20,padding:"1px 7px",fontWeight:600}}>
+                            {e.payMethod==="nakit"?"💵 Nakit":"💳 Kart"}
+                          </span>
+                          {card&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{card.name.split(" ").slice(-1)[0]}</span>}
+                          {e.installments>1&&<span style={{fontSize:10,background:"#e3f2fd",color:"#1565c0",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{e.installments} Taksit</span>}
+                        </div>
+                        {e.note&&<div style={{fontSize:10,color:"#b39ddb",marginTop:2,fontStyle:"italic"}}>{e.note}</div>}
+                      </div>
                     </div>
-                    {e.note&&<div style={{fontSize:10,color:"#b39ddb",marginTop:2,fontStyle:"italic"}}>{e.note}</div>}
+                    <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
+                      <div>
+                        <div style={{fontSize:14,fontWeight:800,color:"#1a1a2e"}}>{fmt(e.amount)}</div>
+                        {e.installments>1&&e.installmentAmt&&<div style={{fontSize:10,color:"#888"}}>{fmt(e.installmentAmt)}/ay</div>}
+                      </div>
+                      {!e.isRecurring&&<div style={{display:"flex",gap:5}}>
+                        <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️</button>
+                        <button onClick={()=>deleteExp(e.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer"}}>🗑</button>
+                      </div>}
+                    </div>
                   </div>
-                </div>
-                <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                  <div>
-                    <div style={{fontSize:14,fontWeight:800,color:"#1a1a2e"}}>{fmt(e.amount)}</div>
-                    {e.installments>1&&e.installmentAmt&&<div style={{fontSize:10,color:"#888"}}>{fmt(e.installmentAmt)}/ay</div>}
-                  </div>
-                  {!e.isRecurring&&<div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️</button>
-                    <button onClick={()=>deleteExp(e.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer"}}>🗑</button>
-                  </div>}
-                </div>
-              </div>
-            </Card>;
-          })}
+                </Card>;
+              })}
+            </>;
+          })()}
 
           <button onClick={exportExcel} style={{...btnS("#27ae60"),marginTop:4}}>📊 Giderleri Excel'e Aktar</button>
         </>}
