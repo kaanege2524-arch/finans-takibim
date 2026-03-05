@@ -275,12 +275,13 @@ function App(){
 
   // Sabit gider kaydet
   function saveRecurring(){
-    if(!rForm.category||!rForm.amount)return;
-    const data={...rForm,amount:Number(rForm.amount),dayOfMonth:Number(rForm.dayOfMonth)||1,totalMonths:Number(rForm.totalMonths)||12,cardId:rForm.cardId?Number(rForm.cardId):null};
+    const finalCat=rForm.category==="__new__"?(rForm.customCatName||"").trim():rForm.category;
+    if(!finalCat||!rForm.amount)return;
+    const data={...rForm,category:finalCat,amount:Number(rForm.amount),dayOfMonth:Number(rForm.dayOfMonth)||1,totalMonths:Number(rForm.totalMonths)||12,cardId:rForm.cardId?Number(rForm.cardId):null};
     if(editRecurringId){setRecurringExp(p=>p.map(r=>r.id===editRecurringId?{...r,...data}:r));setEditRecurringId(null);}
     else{setRecurringExp(p=>[...p,{id:Date.now(),...data}]);}
-    // Kategoriye ekle
-    if(!CATS.find(c=>c.name===rForm.category)){setCustomCats(p=>[...p,{name:rForm.category,icon:rForm.icon}]);}
+    // Yeni kategoriyse listeye ekle
+    if(!CATS.find(c=>c.name===finalCat)){setCustomCats(p=>[...p,{name:finalCat,icon:rForm.icon}]);}
     setRForm(blankRecurring);setShowAddRecurring(false);
   }
   function deleteRecurring(id){if(window.confirm("Sabit gideri sil?"))setRecurringExp(p=>p.filter(r=>r.id!==id));}
@@ -793,7 +794,7 @@ function App(){
                 {ICONS.map(i=><option key={i} value={i}>{i}</option>)}
               </select>
             </div>
-            {rForm.category==="__new__"&&<input style={inp} placeholder="Yeni kategori adı" value={rForm.customCatName||""} onChange={e=>setRForm({...rForm,customCatName:e.target.value,category:e.target.value})}/>}
+            {rForm.category==="__new__"&&<input style={inp} placeholder="Yeni kategori adı" value={rForm.customCatName||""} onChange={e=>setRForm({...rForm,customCatName:e.target.value})}/>}
 
             <input style={inp} type="number" placeholder="Aylık tutar (₺)" value={rForm.amount} onChange={e=>setRForm({...rForm,amount:e.target.value})}/>
             <div style={{display:"flex",gap:8}}>
