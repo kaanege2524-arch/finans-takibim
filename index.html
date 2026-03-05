@@ -1,1434 +1,1082 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0"/>
-  <meta name="theme-color" content="#1a1a2e"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-title" content="Finans Takibim"/>
-  <title>Finans Takibim</title>
-  <style>*{box-sizing:border-box;margin:0;padding:0}body{background:#f2f4f8;font-family:sans-serif}#root{min-height:100vh}</style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#F0EBF8"/>
+<title>KartunPARA ⭐</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#F0EBF8;--bg2:#E8E0F5;--card:#FFF;--border:#E2D9F3;
+  --purple:#9B72CF;--pl:#C4A8E8;--pd:#7A55B0;
+  --pink:#E89BBF;--pkl:#F5C8DF;
+  --yellow:#F5C842;--yl:#FDE9A2;
+  --green:#72C9A8;--gl:#B8EDD8;
+  --blue:#82C4E8;--bl:#C2E3F5;
+  --red:#E88C8C;--rl:#F5C4C4;
+  --text:#2D1F4E;--t2:#6B5A8A;--tm:#A898C0;
+  --r:20px;--rs:14px;
+  --sh:0 2px 16px rgba(155,114,207,.12);
+  --shm:0 4px 24px rgba(155,114,207,.18);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Nunito',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;max-width:430px;margin:0 auto}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle,rgba(155,114,207,.07) 1px,transparent 1px);background-size:24px 24px;pointer-events:none;z-index:0}
+
+/* HEADER */
+.hdr{position:relative;z-index:1;padding:14px 18px 8px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.pig{width:44px;height:44px;background:linear-gradient(135deg,#E8172C,#F9B000);border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(232,23,44,.35);animation:fl 3s ease-in-out infinite;position:relative;overflow:hidden}
+.pig-stars{position:relative;width:36px;height:36px}
+.pig-stars span{position:absolute;font-size:9px;line-height:1}
+.pig-stars .s1{top:0px;left:50%;transform:translateX(-50%)}
+.pig-stars .s2{top:10px;left:2px}
+.pig-stars .s3{top:10px;right:2px}
+.pig-stars .s4{bottom:2px;left:6px}
+.pig-stars .s5{bottom:2px;right:6px}
+@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.ttl{font-family:'Baloo 2',cursive;font-size:23px;font-weight:800;color:var(--pd)}
+.ttl span{color:var(--pink)}
+.bpill{background:var(--yl);color:var(--text);font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px;border:1.5px solid var(--yellow)}
+
+/* BALANCE CARD */
+.bal-card{position:relative;z-index:1;margin:0 16px 10px;background:linear-gradient(135deg,var(--pd),var(--purple) 60%,var(--pink));border-radius:24px;padding:18px 20px;overflow:hidden;box-shadow:0 6px 28px rgba(122,85,176,.28);flex-shrink:0;color:#fff}
+.bal-card::after{content:'⭐';position:absolute;font-size:88px;right:-8px;bottom:-16px;opacity:.1}
+.bl{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;opacity:.8}
+.ba{font-family:'Baloo 2',cursive;font-size:42px;font-weight:800;line-height:1.05;margin:2px 0 12px}
+.ba sup{font-size:19px;opacity:.85;vertical-align:super}
+.bs{display:flex;gap:16px}
+.bv{font-size:14px;font-weight:800}.bvl{font-size:9px;text-transform:uppercase;letter-spacing:.8px;opacity:.7}
+.bv.g{color:#AAFCD8}.bv.r{color:#FFCACA}.bv.b{color:#C0E8FF}
+
+/* GOAL STRIP */
+.gstrip{position:relative;z-index:1;margin:0 16px 8px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.gstrip::-webkit-scrollbar{display:none}
+.gchip{flex-shrink:0;background:var(--card);border:1.5px solid var(--border);border-radius:16px;padding:10px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--sh);cursor:pointer;min-width:150px;transition:transform .15s}
+.gchip:active{transform:scale(.97)}
+.gchip.done{background:linear-gradient(135deg,var(--gl),var(--bl));border-color:var(--green)}
+.gce{font-size:18px}
+.gci{flex:1;min-width:0}
+.gcn{font-size:11px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gcw{font-family:'Baloo 2',cursive;font-size:18px;font-weight:800;color:var(--pd);line-height:1}
+.gcu{font-size:9px;color:var(--tm);font-weight:700}
+.gcb{height:4px;background:var(--bg2);border-radius:4px;margin-top:4px;overflow:hidden}
+.gcbf{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--purple),var(--pink));transition:width .6s ease}
+
+/* NOTIF BANNER */
+.nbnr{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:10000;pointer-events:none}
+.nbi{margin:10px 16px;border-radius:16px;padding:13px 15px;display:flex;align-items:center;gap:11px;pointer-events:all;animation:sld .4s cubic-bezier(.34,1.4,.64,1);box-shadow:0 6px 24px rgba(0,0,0,.2)}
+.nbi.drop{background:linear-gradient(135deg,#3A9070,var(--green))}
+.nbi.rise{background:linear-gradient(135deg,#B03030,var(--red))}
+@keyframes sld{from{opacity:0;transform:translateY(-50px)}to{opacity:1;transform:translateY(0)}}
+.nbico{font-size:26px}
+.nbtxt{flex:1}
+.nbt{font-size:13px;font-weight:800;color:#fff}
+.nbs{font-size:11px;color:rgba(255,255,255,.82);margin-top:1px}
+.nbx{background:rgba(255,255,255,.22);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* NOTIF PROMPT */
+.nprompt{background:linear-gradient(135deg,var(--pl),var(--pkl));border:1.5px solid var(--purple);border-radius:16px;padding:13px 15px;margin-bottom:10px;display:flex;align-items:center;gap:10px}
+.npt{flex:1;font-size:12px;font-weight:700;color:var(--pd);line-height:1.4}
+.npa{background:var(--purple);border:none;color:#fff;border-radius:10px;padding:8px 13px;font-size:12px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif;white-space:nowrap}
+
+/* TABS */
+.tabs{position:relative;z-index:1;display:flex;margin:0 16px 10px;background:var(--card);border-radius:16px;padding:4px;gap:2px;flex-shrink:0;box-shadow:var(--sh)}
+.tab{flex:1;padding:7px 4px;border:none;background:transparent;color:var(--tm);font-family:'Nunito',sans-serif;font-size:10px;font-weight:800;border-radius:12px;cursor:pointer;transition:all .2s;display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab .ti{font-size:16px}
+.tab.active{background:var(--pl);color:var(--pd);box-shadow:var(--sh)}
+
+/* CONTENT */
+.cnt{flex:1;overflow-y:auto;padding:0 16px 110px;position:relative;z-index:1;scrollbar-width:none}
+.cnt::-webkit-scrollbar{display:none}
+.pg{display:none}.pg.active{display:block}
+
+/* SECTION */
+.sh{display:flex;justify-content:space-between;align-items:center;margin:14px 0 9px}
+.st{font-family:'Baloo 2',cursive;font-size:17px;font-weight:700}
+.badd{width:33px;height:33px;background:var(--purple);border:none;border-radius:50%;color:#fff;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(155,114,207,.35);transition:transform .15s}
+.badd:active{transform:scale(.9)}
+.bedit{background:rgba(255,255,255,.65);border:1.5px solid var(--border);border-radius:10px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer;color:var(--t2);font-family:'Nunito',sans-serif}
+
+/* REG INCOME */
+.regc{background:linear-gradient(135deg,var(--gl),var(--bl));border:1.5px solid var(--green);border-radius:var(--r);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;box-shadow:var(--sh)}
+.regt{font-size:12px;font-weight:800;color:#2A7A5A;text-transform:uppercase;letter-spacing:.5px}
+.regn{font-size:11px;color:var(--t2);margin-top:2px}
+.rega{font-family:'Baloo 2',cursive;font-size:30px;font-weight:800;color:var(--text)}
+.rega span{font-size:15px;color:var(--t2)}
+
+/* BONUS */
+.bitem{background:var(--card);border:1.5px solid var(--border);border-radius:var(--rs);padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:7px;box-shadow:var(--sh);animation:pi .3s ease}
+@keyframes pi{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+.bico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.bin{flex:1}
+.bname{font-size:13px;font-weight:800}
+.bdate{font-size:11px;color:var(--tm)}
+.bamt{font-family:'Baloo 2',cursive;font-size:18px;font-weight:700;color:var(--green)}
+.bdel{background:none;border:none;color:var(--tm);font-size:14px;cursor:pointer;padding:4px;border-radius:6px}
+.bdel:active{color:var(--red)}
+
+/* GOAL CARD */
+.gc{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);margin-bottom:14px;overflow:hidden;box-shadow:var(--shm);animation:pi .3s ease}
+.gtop{padding:14px 14px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.gen{width:46px;height:46px;background:var(--bg2);border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.gnm{font-size:15px;font-weight:800;line-height:1.2}
+.gpt{font-size:12px;font-weight:700;color:var(--t2);margin-top:2px}
+.gpt strong{color:var(--pd)}
+
+/* COUNTDOWN */
+.gcd{background:linear-gradient(135deg,var(--pd),var(--purple));border-radius:15px;margin:0 14px 12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;color:#fff;box-shadow:0 4px 14px rgba(122,85,176,.22)}
+.gcd.done{background:linear-gradient(135deg,#4A9E78,var(--green))}
+.cdl{}
+.cdt{font-size:11px;font-weight:800;opacity:.85;text-transform:uppercase;letter-spacing:.9px}
+.cds{font-size:11px;opacity:.75;margin-top:2px;line-height:1.4}
+.cdd{font-size:10px;opacity:.6;margin-top:3px}
+.cdr{text-align:right;flex-shrink:0;margin-left:10px}
+.cdn{font-family:'Baloo 2',cursive;font-size:46px;font-weight:800;line-height:1}
+.cdu{font-size:11px;font-weight:700;opacity:.8;letter-spacing:.5px}
+
+/* PROGRESS */
+.gprog{padding:0 14px 12px}
+.pbw{height:11px;background:var(--bg2);border-radius:20px;overflow:hidden;margin-bottom:5px}
+.pbf{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--purple),var(--pink));transition:width .9s cubic-bezier(.34,1.56,.64,1);position:relative;min-width:6px}
+.pbf::after{content:'';position:absolute;right:0;top:2px;bottom:2px;width:4px;background:rgba(255,255,255,.6);border-radius:50%;animation:blk 1.4s ease-in-out infinite}
+@keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}
+.plbl{display:flex;justify-content:space-between;font-size:11px;color:var(--tm)}
+.plbl strong{color:var(--text)}
+
+/* CHART */
+.gcha{padding:0 14px 12px}
+.chh{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.cht{font-size:12px;font-weight:800;color:var(--t2)}
+.chref{font-size:11px;font-weight:700;color:var(--purple);background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;padding:4px 9px;cursor:pointer;font-family:'Nunito',sans-serif}
+.chc{position:relative;height:135px}
+.chl{height:110px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--tm);font-size:12px;font-weight:700;background:var(--bg2);border-radius:12px}
+
+/* PRICE TAGS */
+.ptags{padding:0 14px 12px;display:flex;flex-wrap:wrap;gap:5px}
+.ptag{display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.ptag.low{background:var(--gl);color:#2A7A5A;border:1.5px solid var(--green)}
+.ptag.high{background:var(--rl);color:#8A2A2A;border:1.5px solid var(--red)}
+.ptag.info{background:var(--bl);color:#1A5A8A;border:1.5px solid var(--blue)}
+
+/* GOAL FOOTER */
+.gft{padding:9px 14px;background:var(--bg2);display:flex;justify-content:space-between;align-items:center;border-top:1.5px solid var(--border)}
+.gfurl{font-size:11px;font-weight:700;color:var(--purple);background:none;border:none;cursor:pointer;font-family:'Nunito',sans-serif}
+
+/* EXPENSE */
+.eitem{background:var(--card);border:1.5px solid var(--border);border-radius:var(--rs);padding:11px 13px;display:flex;align-items:center;gap:11px;margin-bottom:7px;box-shadow:var(--sh);animation:pi .3s ease}
+.eico{width:38px;height:38px;background:var(--rl);border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.ein{flex:1}
+.enm{font-size:13px;font-weight:800}
+.edt{font-size:11px;color:var(--tm)}
+.eart{font-family:'Baloo 2',cursive;font-size:18px;font-weight:700;color:var(--red)}
+
+/* BADGES */
+.bgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;padding-top:4px}
+.bcard{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);padding:13px 8px;text-align:center;box-shadow:var(--sh)}
+.bcard.earn{background:linear-gradient(135deg,var(--yl),var(--pkl));border-color:var(--yellow)}
+.bcard.lock{opacity:.4;filter:grayscale(.7)}
+.bem{font-size:29px;display:block;margin-bottom:5px}
+.bbn{font-size:10px;font-weight:800;line-height:1.2}
+.bbd{font-size:9px;color:var(--tm);margin-top:2px}
+.bbok{font-size:9px;color:#7A5A10;font-weight:800;margin-top:3px}
+
+/* BOTTOM NAV */
+.bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:rgba(240,235,248,.96);backdrop-filter:blur(20px);border-top:1.5px solid var(--border);display:flex;padding:7px 0 20px;z-index:100;box-shadow:0 -4px 20px rgba(155,114,207,.1)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;color:var(--tm);font-size:10px;font-weight:800;font-family:'Nunito',sans-serif;cursor:pointer;transition:all .2s;padding:3px 0}
+.nb .ni{font-size:21px;transition:transform .2s}
+.nb.active{color:var(--pd)}
+.nb.active .ni{transform:scale(1.2)}
+
+/* MODALS */
+.mo{position:fixed;inset:0;background:rgba(45,31,78,.45);backdrop-filter:blur(6px);z-index:200;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .25s}
+.mo.open{opacity:1;pointer-events:all}
+.ms{width:100%;max-width:430px;margin:0 auto;background:var(--card);border-radius:28px 28px 0 0;padding:18px 18px 42px;transform:translateY(100%);transition:transform .35s cubic-bezier(.34,1.4,.64,1);max-height:92vh;overflow-y:auto}
+.mo.open .ms{transform:translateY(0)}
+.mh{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.mt{font-family:'Baloo 2',cursive;font-size:21px;font-weight:800;text-align:center;margin-bottom:16px}
+.fg{margin-bottom:13px}
+.fl{font-size:11px;font-weight:800;color:var(--tm);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;display:block}
+.fi{width:100%;background:var(--bg2);border:1.5px solid var(--border);border-radius:13px;padding:11px 14px;color:var(--text);font-family:'Nunito',sans-serif;font-size:15px;font-weight:600;outline:none;transition:border-color .2s}
+.fi:focus{border-color:var(--purple)}
+.fi::placeholder{color:var(--tm)}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ep{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px}
+.eo{width:38px;height:38px;background:var(--bg2);border:2px solid transparent;border-radius:11px;font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.eo.sel{border-color:var(--purple);background:var(--pl)}
+.bsub{width:100%;padding:14px;background:linear-gradient(135deg,var(--pd),var(--purple));border:none;border-radius:15px;color:#fff;font-family:'Baloo 2',cursive;font-size:17px;font-weight:700;cursor:pointer;margin-top:5px;box-shadow:0 4px 16px rgba(122,85,176,.3);transition:transform .15s}
+.bsub:active{transform:scale(.98)}
+.brow{display:flex;gap:8px;margin-top:5px}
+.bdng{flex:1;padding:12px;background:var(--rl);border:1.5px solid var(--red);border-radius:13px;color:#8A2A2A;font-family:'Baloo 2',cursive;font-size:15px;font-weight:700;cursor:pointer}
+.bsav{flex:2;padding:12px;background:linear-gradient(135deg,var(--pd),var(--purple));border:none;border-radius:13px;color:#fff;font-family:'Baloo 2',cursive;font-size:15px;font-weight:700;cursor:pointer}
+
+/* TOAST */
+.tw{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:7px;width:calc(100% - 28px);max-width:400px;pointer-events:none}
+.tst{background:var(--card);border:1.5px solid var(--border);border-radius:13px;padding:11px 14px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;box-shadow:var(--shm);animation:tin .3s ease}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+
+/* CONFETTI */
+.cp{position:fixed;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:9998;animation:cf linear forwards}
+@keyframes cf{0%{transform:translateY(-10px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
+/* EMPTY */
+.emp{text-align:center;padding:26px 18px;color:var(--tm)}
+.ei{font-size:36px;opacity:.5;margin-bottom:7px}
+.et{font-size:13px;font-weight:600;line-height:1.5}
+
+/* PARENT MODE */
+body.parent-mode .badd,
+body.parent-mode .bedit,
+body.parent-mode .bdel,
+body.parent-mode .nprompt { display:none !important; }
+.parent-banner{position:relative;z-index:1;margin:0 16px 8px;background:linear-gradient(135deg,#2D6A9F,#4A9FD4);border-radius:16px;padding:11px 16px;display:flex;align-items:center;gap:10px;color:#fff;box-shadow:0 3px 12px rgba(45,106,159,.3);flex-shrink:0}
+.pb-ico{font-size:22px}
+.pb-txt{flex:1}
+.pb-t{font-size:13px;font-weight:800}
+.pb-s{font-size:11px;opacity:.8;margin-top:1px}
+.pb-ref{background:rgba(255,255,255,.22);border:none;color:#fff;border-radius:8px;padding:6px 11px;font-size:11px;font-weight:800;cursor:pointer;font-family:'Nunito',sans-serif}
+</style>
 </head>
 <body>
-<div id="root">
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;background:#1a1a2e;color:#fff;font-family:sans-serif;gap:16px">
-    <div style="font-size:36px">💰</div>
-    <div style="font-size:18px;font-weight:700">Finans Takibim</div>
-    <div style="font-size:13px;opacity:.6">Yükleniyor...</div>
-    <div style="width:40px;height:40px;border:3px solid rgba(255,255,255,.2);border-top-color:#c0392b;border-radius:50%;animation:spin 1s linear infinite"></div>
-    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+
+<!-- Header -->
+<div class="hdr">
+  <div class="hdr-l">
+    <div class="pig"><div class="pig-stars"><span class="s1">⭐</span><span class="s2">⭐</span><span class="s3">⭐</span><span class="s4">⭐</span><span class="s5">⭐</span></div></div>
+    <div class="ttl">Kartun<span>PARA</span></div>
+  </div>
+  <div id="bpill" style="display:none"><span class="bpill" id="btxt">🏆 0</span></div>
+</div>
+
+<!-- Parent Banner (shown only in parent mode) -->
+<div class="parent-banner" id="parentBanner" style="display:none">
+  <div class="pb-ico">👨‍👩‍👧</div>
+  <div class="pb-txt">
+    <div class="pb-t">Ebeveyn Görünümü</div>
+    <div class="pb-s" id="pbLastUpdate">Veriler yükleniyor…</div>
+  </div>
+  <button class="pb-ref" onclick="reloadParent()">🔄 Yenile</button>
+</div>
+
+<!-- Balance -->
+<div class="bal-card">
+  <div class="bl">Toplam Birikim</div>
+  <div class="ba" id="balAmt"><sup>₺</sup>0</div>
+  <div class="bs">
+    <div><div class="bv g" id="sInc">+₺0</div><div class="bvl">Toplam Gelir</div></div>
+    <div><div class="bv r" id="sExp">-₺0</div><div class="bvl">Harcama</div></div>
+    <div><div class="bv b" id="sWkly">₺0</div><div class="bvl">Haftalık</div></div>
   </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.5/babel.min.js"></script>
 
-<script>
-window.addEventListener('load', function() {
-  var appScript = document.getElementById('app-code');
-  var code = appScript.textContent;
-  var transformed = Babel.transform(code, { presets: ['react'] }).code;
-  eval(transformed);
-});
-</script>
+<!-- Goal Strip -->
+<div class="gstrip" id="gstrip"></div>
 
-<script id="app-code" type="text/plain">
-const {useState,useRef,useMemo}=React;
+<!-- Notification banner -->
+<div class="nbnr" id="nbnr"></div>
 
-// ── Hafif SVG grafik bileşenleri (Recharts yerine) ────────────────────────
-function PieChart({data,colors}){
-  const size=160,cx=80,cy=80,r=55,ir=32;
-  const total=data.reduce((s,d)=>s+d.value,0);
-  if(total===0)return null;
-  let angle=-Math.PI/2;
-  const slices=data.map((d,i)=>{
-    const a=(d.value/total)*2*Math.PI;
-    const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
-    const x2=cx+r*Math.cos(angle+a),y2=cy+r*Math.sin(angle+a);
-    const ix1=cx+ir*Math.cos(angle),iy1=cy+ir*Math.sin(angle);
-    const ix2=cx+ir*Math.cos(angle+a),iy2=cy+ir*Math.sin(angle+a);
-    const large=a>Math.PI?1:0;
-    const path=`M${ix1},${iy1} L${x1},${y1} A${r},${r},0,${large},1,${x2},${y2} L${ix2},${iy2} A${ir},${ir},0,${large},0,${ix1},${iy1}Z`;
-    angle+=a;
-    return <path key={i} d={path} fill={colors[i%colors.length]} opacity={0.9}/>;
-  });
-  return <svg width={size} height={size} style={{display:'block',margin:'0 auto'}}>{slices}</svg>;
-}
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab active" onclick="goTab('inc')" id="tab-inc"><span class="ti">💰</span>Gelirler</button>
+  <button class="tab" onclick="goTab('gls')" id="tab-gls"><span class="ti">🎯</span>Hedefler</button>
+  <button class="tab" onclick="goTab('exp')" id="tab-exp"><span class="ti">🛍️</span>Harcama</button>
+  <button class="tab" onclick="goTab('bdg')" id="tab-bdg"><span class="ti">🏆</span>Rozetler</button>
+</div>
 
-function BarChartH({data,color='#c0392b'}){
-  if(!data||data.length===0)return null;
-  const max=Math.max(...data.map(d=>d.value),1);
-  return <div style={{padding:'4px 0'}}>
-    {data.map((d,i)=>(
-      <div key={i} style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-        <div style={{width:80,fontSize:10,color:'#555',textAlign:'right',flexShrink:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{d.label}</div>
-        <div style={{flex:1,background:'#f5f5f5',borderRadius:99,height:18,overflow:'hidden'}}>
-          <div style={{width:`${(d.value/max)*100}%`,height:'100%',background:color,borderRadius:99,transition:'width .5s',display:'flex',alignItems:'center',paddingLeft:6}}>
-            {(d.value/max)>0.25&&<span style={{fontSize:9,color:'#fff',fontWeight:600,whiteSpace:'nowrap'}}>{new Intl.NumberFormat('tr-TR',{maximumFractionDigits:0}).format(d.value)}₺</span>}
-          </div>
-        </div>
+<!-- Content -->
+<div class="cnt">
+
+  <!-- INCOME -->
+  <div id="pg-inc" class="pg active">
+    <div id="nprompt" style="display:none" class="nprompt">
+      <div class="npt">🔔 Fiyat düşüşlerinde bildirim almak ister misin?</div>
+      <button class="npa" onclick="askNotif()">İzin Ver</button>
+    </div>
+    <div class="sh">
+      <div class="st">💵 Düzenli Gelir</div>
+      <button class="bedit" onclick="openM('ri')">Düzenle</button>
+    </div>
+    <div class="regc">
+      <div>
+        <div class="regt">📅 Haftalık Harçlık</div>
+        <div class="regn" id="nextDt">Sonraki tarih hesaplanıyor…</div>
       </div>
-    ))}
-  </div>;
-}
-
-function LineChartSimple({data}){
-  if(!data||data.length<2)return null;
-  const W=300,H=80,pad=30;
-  const vals=data.map(d=>d.value);
-  const minV=Math.min(...vals),maxV=Math.max(...vals,1);
-  const pts=data.map((d,i)=>{
-    const x=pad+(i/(data.length-1))*(W-pad*2);
-    const y=H-pad-((d.value-minV)/(maxV-minV||1))*(H-pad*2);
-    return [x,y];
-  });
-  const polyline=pts.map(p=>p.join(',')).join(' ');
-  return <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{overflow:'visible'}}>
-    <polyline points={polyline} fill="none" stroke="#c0392b" strokeWidth="2.5" strokeLinejoin="round"/>
-    {pts.map(([x,y],i)=><circle key={i} cx={x} cy={y} r="4" fill="#c0392b"/>)}
-    {data.map((d,i)=>{
-      const [x,y]=pts[i];
-      return <text key={i} x={x} y={H-4} textAnchor="middle" fontSize="9" fill="#888">{d.label}</text>;
-    })}
-    {pts.map(([x,y],i)=>{
-      return <text key={i} x={x} y={y-8} textAnchor="middle" fontSize="9" fill="#c0392b" fontWeight="600">{data[i].value}K</text>;
-    })}
-  </svg>;
-}
-
-const COLORS=["#e74c3c","#e67e22","#f1c40f","#2ecc71","#3498db","#9b59b6"];
-const MONTHS=["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"];
-
-const initDebts=[
-  {id:1,name:"Konut Kredisi",type:"kredi",total:185000,remaining:142000,monthly:3200,rate:1.89,months:44,payDay:5},
-  {id:2,name:"Taşıt Kredisi",type:"kredi",total:45000,remaining:28500,monthly:1450,rate:2.1,months:19,payDay:10},
-  {id:3,name:"Kredi Kartı - Ziraat",type:"kredi_karti",total:12000,remaining:12000,monthly:1200,rate:4.5,months:null,payDay:15,userPayment:2000,kesimGunu:25,sonOdemeGunu:5},
-  {id:4,name:"Kredi Kartı - Garanti",type:"kredi_karti",total:8500,remaining:8500,monthly:850,rate:4.5,months:null,payDay:20,userPayment:1500,kesimGunu:20,sonOdemeGunu:30},
-  {id:5,name:"KMH - İş Bankası",type:"kmh",total:15000,remaining:9800,monthly:600,rate:3.2,months:null,payDay:25,userPayment:1200},
-];
-
-const initExpenses=[
-  {id:1,category:"Market",amount:4200,date:"2026-02-28",icon:"🛒",payMethod:"nakit",cardId:null,installments:1},
-  {id:2,category:"Faturalar",amount:1800,date:"2026-02-25",icon:"💡",payMethod:"nakit",cardId:null,installments:1},
-  {id:3,category:"Ulaşım",amount:900,date:"2026-02-20",icon:"🚌",payMethod:"nakit",cardId:null,installments:1},
-  {id:4,category:"Giyim",amount:2400,date:"2026-03-01",icon:"👕",payMethod:"kredi_karti",cardId:3,installments:3},
-  {id:5,category:"Yemek/Dışarı",amount:1800,date:"2026-03-02",icon:"🍽️",payMethod:"kredi_karti",cardId:4,installments:1},
-];
-
-const initIncomes=[
-  {id:1,label:"Yılsonu İkramiyesi",amount:8500,date:"2026-03-10",recurring:false},
-  {id:2,label:"Fazla Mesai",amount:1200,date:"2026-03-20",recurring:true},
-];
-
-const BASE_CATS=[
-  {name:"Market",icon:"🛒"},{name:"Faturalar",icon:"💡"},{name:"Ulaşım",icon:"🚌"},
-  {name:"Sağlık",icon:"💊"},{name:"Giyim",icon:"👕"},{name:"Yemek/Dışarı",icon:"🍽️"},
-  {name:"Eğlence",icon:"🎬"},{name:"Eğitim",icon:"📚"},{name:"Diğer",icon:"📌"},
-];
-
-const initRecurring=[
-  {id:1,category:"Ev Kirası",icon:"🏠",amount:8500,dayOfMonth:1,startDate:"2026-03-01",totalMonths:12,payMethod:"nakit",cardId:null,note:"Yıllık kira sözleşmesi"},
-];
-
-const ICONS=["🏠","🚗","📱","💈","🎓","🏋️","🐾","💊","🔌","🌐","🎵","📦","🍼","🧹","💰","📌"];
-
-const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0}).format(n);
-
-function buildFlexPlan(debt){
-  const rate=debt.rate/100;
-  const pay=debt.userPayment||debt.monthly;
-  let rem=debt.remaining; const plan=[];
-  for(let i=0;i<120&&rem>1;i++){
-    const int=Math.round(rem*rate);
-    const actual=Math.max(pay,int+1);
-    const prin=Math.min(actual-int,rem);
-    rem=Math.max(0,rem-prin);
-    const d=new Date(2026,2+i,debt.payDay||15);
-    plan.push({month:i+1,label:`${MONTHS[d.getMonth()]} ${d.getFullYear()}`,date:`${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`,payment:Math.round(int+prin),interest:Math.round(int),principal:Math.round(prin),remaining:Math.round(rem)});
-    if(rem<=0)break;
-  }
-  return plan;
-}
-
-function buildFixedPlan(debt){
-  return Array.from({length:debt.months},(_,i)=>{
-    const d=new Date(2026,2+i,debt.payDay||5);
-    return {month:i+1,label:`${MONTHS[d.getMonth()]} ${d.getFullYear()}`,date:`${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`,payment:debt.monthly,interest:null,principal:null,remaining:Math.max(0,debt.remaining-debt.monthly*(i+1))};
-  });
-}
-
-function calcSmart(debts,income,living){
-  const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
-  const available=Math.max(0,income-fixedTotal-living);
-  const flex=[...debts.filter(d=>d.type!=="kredi")].sort((a,b)=>b.rate-a.rate);
-  if(!flex.length||available<=0)return{payments:[],available,fixedTotal,living,surplus:0};
-  const payments=flex.map(d=>{const minPay=Math.ceil(d.remaining*(d.rate/100))+1;return{id:d.id,name:d.name,type:d.type,remaining:d.remaining,rate:d.rate,minPay,suggested:minPay};});
-  let extra=available-payments.reduce((s,p)=>s+p.minPay,0);
-  if(extra<0){payments.forEach(p=>{p.suggested=Math.max(p.minPay,Math.round(available*(p.remaining/flex.reduce((s,d)=>s+d.remaining,0))));});}
-  else{for(let i=0;i<payments.length&&extra>0;i++){const add=Math.min(extra,Math.max(0,payments[i].remaining*1.05-payments[i].suggested));payments[i].suggested+=Math.round(add);extra-=Math.round(add);}}
-  payments.forEach(p=>{
-    let rem=p.remaining;const rate=p.rate/100;let months=0;
-    while(rem>0&&months<120){const int=rem*rate;const prin=Math.max(0,p.suggested-int);rem-=prin;months++;if(prin<=0)break;}
-    p.finishMonths=months;
-    const fd=new Date(2026,2+months-1,1);p.finishLabel=`${MONTHS[fd.getMonth()]} ${fd.getFullYear()}`;
-    p.totalInterest=Math.round(p.suggested*months-p.remaining);
-    let remMin=p.remaining;let mMin=0;
-    while(remMin>0&&mMin<240){const int=remMin*rate;const prin=Math.max(0,p.minPay-int);remMin-=prin;mMin++;if(prin<=0)break;}
-    p.savedVsMin=Math.max(0,(p.minPay*mMin-p.remaining)-(p.suggested*months-p.remaining));
-  });
-  return{payments,available,fixedTotal,living,surplus:Math.round(available-payments.reduce((s,p)=>s+p.suggested,0))};
-}
-
-// ── COMPONENTS ──────────────────────────────────────────────────────────────
-function Tab({label,active,onClick,badge}){
-  return <button onClick={onClick} style={{flex:1,padding:"9px 2px",border:"none",background:"none",color:active?"#1a1a2e":"#8892a4",fontWeight:active?"700":"500",fontSize:"10.5px",cursor:"pointer",position:"relative",borderBottom:active?"2px solid #c0392b":"2px solid transparent",transition:"all 0.2s",fontFamily:"'Sora',sans-serif"}}>
-    {label}
-    {badge!=null&&<span style={{position:"absolute",top:5,right:"8%",background:"#c0392b",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center"}}>{badge}</span>}
-  </button>;
-}
-function Card({children,style={}}){
-  return <div style={{background:"#fff",borderRadius:16,padding:"16px 14px",boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:12,...style}}>{children}</div>;
-}
-function TBadge({type}){
-  const m={kredi:["#e8f4fd","#2980b9","Kredi"],kredi_karti:["#fdf3e8","#e67e22","K.Kartı"],kmh:["#f3e8fd","#8e44ad","KMH"]};
-  const [bg,c,l]=m[type]||["#eee","#555",type];
-  return <span style={{background:bg,color:c,borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:600}}>{l}</span>;
-}
-
-// ── MAIN APP ─────────────────────────────────────────────────────────────────
-function App(){
-  const [tab,setTab]=useState("ozet");
-  const [debts,setDebts]=useState(initDebts);
-  const [expenses,setExpenses]=useState(initExpenses);
-  const [recurringExp,setRecurringExp]=useState(initRecurring);
-  const [customCats,setCustomCats]=useState([{name:"Ev Kirası",icon:"🏠"}]);
-  const [incomes,setIncomes]=useState(initIncomes);
-  const [salary,setSalary]=useState(28500);
-  const [salaryInput,setSalaryInput]=useState("28500");
-  const [aiLoading,setAiLoading]=useState(false);
-  const [aiAdvice,setAiAdvice]=useState(null);
-  const [chatMessages,setChatMessages]=useState([]);
-  const [chatInput,setChatInput]=useState("");
-  const [chatLoading,setChatLoading]=useState(false);
-  const chatEndRef=useRef(null);
-  const chatInputRef=useRef(null);
-  const [showFullPlan,setShowFullPlan]=useState(false);
-  const [suggApplied,setSuggApplied]=useState(false);
-
-  // Modals / forms
-  const [editDebtId,setEditDebtId]=useState(null);      // borç düzenleme
-  const [showAddDebt,setShowAddDebt]=useState(false);
-  const [showAddExp,setShowAddExp]=useState(false);
-  const [showAddIncome,setShowAddIncome]=useState(false);
-  const [showPurchase,setShowPurchase]=useState(false);
-  const [showAddRecurring,setShowAddRecurring]=useState(false);
-  const [showAddCat,setShowAddCat]=useState(false);
-  const [editRecurringId,setEditRecurringId]=useState(null);
-  const [monthlyReport,setMonthlyReport]=useState(null);
-  const [reportLoading,setReportLoading]=useState(false);  // kart alışverişi
-
-  const blankDebt={name:"",type:"kredi",remaining:"",monthly:"",rate:"",months:"",payDay:"",userPayment:"",kesimGunu:"",sonOdemeGunu:""};
-  const [dForm,setDForm]=useState(blankDebt);
-
-  const blankExp={category:"Market",amount:"",date:new Date().toISOString().slice(0,10),payMethod:"nakit",cardId:"",installments:1};
-  const [eForm,setEForm]=useState(blankExp);
-  const [editExpId,setEditExpId]=useState(null);
-
-  const blankRecurring={category:"",icon:"🏠",amount:"",dayOfMonth:1,startDate:new Date().toISOString().slice(0,10),totalMonths:12,payMethod:"nakit",cardId:"",note:""};
-  const [rForm,setRForm]=useState(blankRecurring);
-  const [catForm,setCatForm]=useState({name:"",icon:"📌"});
-
-  const [iForm,setIForm]=useState({label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:false});
-
-  // Kart alışverişi formu
-  const blankPurchase={cardId:"",description:"",amount:"",installments:1,date:new Date().toISOString().slice(0,10)};
-  const [pForm,setPForm]=useState(blankPurchase);
-
-  // Tarih sabitleri — tüm hesaplamalardan önce
-  const curMonth=new Date().toISOString().slice(0,7);
-
-  // Dinamik kategori listesi
-  const CATS=useMemo(()=>[...BASE_CATS,...customCats.filter(c=>!BASE_CATS.find(b=>b.name===c.name))],[customCats]);
-
-  // Bu ay aktif tekrarlayan giderleri hesapla
-  const activeRecurring=useMemo(()=>{
-    return recurringExp.filter(r=>{
-      const start=new Date(r.startDate);
-      const startMonth=start.getFullYear()*12+start.getMonth();
-      const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
-      const elapsed=nowMonth-startMonth;
-      return elapsed>=0&&elapsed<r.totalMonths;
-    });
-  },[recurringExp]);
-
-  // Tekrarlayan giderleri bu aya ekle (gider listesine sanal olarak)
-  const allExpenses=useMemo(()=>{
-    const synth=activeRecurring.map(r=>({
-      id:`rec_${r.id}`,
-      category:r.category,
-      amount:r.amount,
-      date:`${curMonth}-${String(r.dayOfMonth).padStart(2,'0')}`,
-      icon:r.icon,
-      payMethod:r.payMethod,
-      cardId:r.cardId,
-      installments:1,
-      isRecurring:true,
-      recurringId:r.id,
-      note:r.note,
-    }));
-    return [...expenses,...synth];
-  },[expenses,activeRecurring,curMonth]);
-
-  // Sabit gider kaydet
-  function saveRecurring(){
-    if(!rForm.category||!rForm.amount)return;
-    const data={...rForm,amount:Number(rForm.amount),dayOfMonth:Number(rForm.dayOfMonth)||1,totalMonths:Number(rForm.totalMonths)||12,cardId:rForm.cardId?Number(rForm.cardId):null};
-    if(editRecurringId){setRecurringExp(p=>p.map(r=>r.id===editRecurringId?{...r,...data}:r));setEditRecurringId(null);}
-    else{setRecurringExp(p=>[...p,{id:Date.now(),...data}]);}
-    // Kategoriye ekle
-    if(!CATS.find(c=>c.name===rForm.category)){setCustomCats(p=>[...p,{name:rForm.category,icon:rForm.icon}]);}
-    setRForm(blankRecurring);setShowAddRecurring(false);
-  }
-  function deleteRecurring(id){if(window.confirm("Sabit gideri sil?"))setRecurringExp(p=>p.filter(r=>r.id!==id));}
-
-  function saveCustomCat(){
-    if(!catForm.name)return;
-    setCustomCats(p=>[...p,{name:catForm.name,icon:catForm.icon||"📌"}]);
-    setCatForm({name:"",icon:"📌"});setShowAddCat(false);
-  }
-
-  // Aylık AI Raporu
-  async function getMonthlyReport(){
-    setReportLoading(true);setMonthlyReport(null);
-    const prevMonth=new Date(new Date().setMonth(new Date().getMonth()-1));
-    const prevKey=`${prevMonth.getFullYear()}-${String(prevMonth.getMonth()+1).padStart(2,'0')}`;
-    const prevExpenses=allExpenses.filter(e=>e.date.slice(0,7)===prevKey);
-    const prevTotal=prevExpenses.reduce((s,e)=>s+e.amount,0);
-    const prevCats={};prevExpenses.forEach(e=>{prevCats[e.category]=(prevCats[e.category]||0)+e.amount;});
-    const curExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth);
-    const curTotal=curExpenses.reduce((s,e)=>s+e.amount,0);
-    const recurTotalPrev=activeRecurring.reduce((s,r)=>s+r.amount,0);
-
-    const prompt=`Sen bir Türk kişisel finans danışmanısın. Aşağıdaki verilere göre kısa, net, yapıcı bir aylık finansal rapor hazırla.
-
-📅 RAPOR DÖNEMİ: ${MONTHS[prevMonth.getMonth()]} ${prevMonth.getFullYear()}
-
-GELİR:
-- Maaş: ${fmt(salary)}
-- Ek gelirler: ${fmt(thisMonthExtra)}
-- Toplam: ${fmt(totalIncome)}
-
-BORÇ ÖDEMELERİ: ${fmt(totalMonthly)} (gelirin %${debtRatio}'i)
-- ${debts.map(d=>`${d.name}: ${fmt(d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly)}`).join(', ')}
-
-GEÇTİĞİMİZ AY GİDERLER: ${fmt(prevTotal)}
-${Object.entries(prevCats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`- ${k}: ${fmt(v)}`).join('\n')}
-
-SABİT MASRAFLAR (aylık): ${fmt(recurTotalPrev)}
-${activeRecurring.map(r=>`- ${r.category}: ${fmt(r.amount)}`).join('\n')}
-
-BU AY GİDERLER (şimdiye kadar): ${fmt(curTotal)}
-
-NET KALAN GEÇEN AY: ${fmt(totalIncome-totalMonthly-prevTotal)}
-
-Raporda şunları içer:
-1. 📊 Genel değerlendirme (2 cümle)
-2. 💸 En yüksek 3 gider kalemi ve yorum
-3. ⚠️ Dikkat edilmesi gereken noktalar
-4. ✅ Olumlu gelişmeler
-5. 🎯 Gelecek ay için 3 somut öneri
-
-Türkçe, samimi, max 350 kelime. Rakamları kullan.`;
-
-    try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-      const d=await r.json();setMonthlyReport(d.content?.[0]?.text||"Yanıt alınamadı.");
-    }catch{setMonthlyReport("Bağlantı hatası.");}
-    setReportLoading(false);
-  }
-  const thisMonthExtra=incomes.filter(e=>e.recurring||e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
-  const totalIncome=salary+thisMonthExtra;
-  const totalDebt=debts.reduce((s,d)=>s+d.remaining,0);
-  const totalMonthly=debts.reduce((s,d)=>s+(d.type!=="kredi"&&d.userPayment?d.userPayment:d.monthly),0);
-  const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
-  const freeIncome=totalIncome-totalMonthly-totalExpenses;
-  const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
-  const estLiving=totalExpenses>0?totalExpenses:Math.round(totalIncome*0.35);
-  const smart=calcSmart(debts,totalIncome,estLiving);
-
-  const creditCards=debts.filter(d=>d.type==="kredi_karti");
-
-  // Kredi kartları için bu ay son ödeme uyarısı
-  const today=new Date();
-  const cardAlerts=creditCards.map(c=>{
-    if(!c.sonOdemeGunu)return null;
-    const son=new Date(today.getFullYear(),today.getMonth(),c.sonOdemeGunu);
-    const diffDays=Math.ceil((son-today)/(1000*60*60*24));
-    if(diffDays>=0&&diffDays<=7)return{id:c.id,name:c.name,diffDays,son};
-    return null;
-  }).filter(Boolean);
-
-  // Master ödeme planı
-  function masterPlan(){
-    const all=[];
-    debts.forEach(d=>{
-      const plan=d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d);
-      plan.forEach(r=>all.push({...r,debtName:d.name,debtType:d.type}));
-    });
-    const grouped={};
-    all.forEach(p=>{
-      if(!grouped[p.label])grouped[p.label]={label:p.label,month:p.month,payments:[],total:0};
-      grouped[p.label].payments.push(p);grouped[p.label].total+=p.payment;
-    });
-    return Object.values(grouped).sort((a,b)=>a.month-b.month);
-  }
-  const plan=useMemo(()=>masterPlan(),[debts]);
-  const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
-
-  // ── ACTIONS ──────────────────────────────────────────────────────────────
-  function saveDebt(){
-    if(!dForm.name||!dForm.remaining)return;
-    const d={...dForm,id:editDebtId||Date.now(),remaining:Number(dForm.remaining),monthly:Number(dForm.monthly),rate:Number(dForm.rate),months:dForm.months?Number(dForm.months):null,payDay:Number(dForm.payDay)||15,userPayment:dForm.type!=="kredi"?Number(dForm.userPayment||dForm.monthly):null,total:Number(dForm.remaining),kesimGunu:Number(dForm.kesimGunu)||null,sonOdemeGunu:Number(dForm.sonOdemeGunu)||null};
-    if(editDebtId){setDebts(p=>p.map(x=>x.id===editDebtId?d:x));}
-    else{setDebts(p=>[...p,d]);}
-    setDForm(blankDebt);setEditDebtId(null);setShowAddDebt(false);
-  }
-  function startEdit(debt){
-    setDForm({name:debt.name,type:debt.type,remaining:debt.remaining,monthly:debt.monthly,rate:debt.rate,months:debt.months||"",payDay:debt.payDay||"",userPayment:debt.userPayment||"",kesimGunu:debt.kesimGunu||"",sonOdemeGunu:debt.sonOdemeGunu||""});
-    setEditDebtId(debt.id);setShowAddDebt(true);
-  }
-  function deleteDebt(id){if(window.confirm("Bu borcu silmek istiyor musun?"))setDebts(p=>p.filter(d=>d.id!==id));}
-
-  function saveExpense(){
-    if(!eForm.amount||!eForm.category)return;
-    const cat=CATS.find(c=>c.name===eForm.category);
-    const updated={...eForm,amount:Number(eForm.amount),icon:cat?.icon||"📌",cardId:eForm.cardId?Number(eForm.cardId):null,installments:Number(eForm.installments)||1};
-    if(editExpId){
-      setExpenses(p=>p.map(e=>e.id===editExpId?{...e,...updated}:e));
-      setEditExpId(null);
-    } else {
-      setExpenses(p=>[...p,{id:Date.now(),...updated}]);
-    }
-    setEForm(blankExp);setShowAddExp(false);
-  }
-  function startEditExp(e){
-    setEForm({category:e.category,amount:e.amount,date:e.date,payMethod:e.payMethod,cardId:e.cardId||"",installments:e.installments||1});
-    setEditExpId(e.id);setShowAddExp(true);window.scrollTo({top:0,behavior:'smooth'});
-  }
-  function deleteExp(id){if(window.confirm("Bu gideri silmek istiyor musun?"))setExpenses(p=>p.filter(e=>e.id!==id));}
-
-  function savePurchase(){
-    if(!pForm.cardId||!pForm.amount)return;
-    const card=debts.find(d=>d.id===Number(pForm.cardId));
-    if(!card)return;
-    const installAmt=Math.round(Number(pForm.amount)/Number(pForm.installments));
-    // Kart borcuna ekle
-    setDebts(p=>p.map(d=>d.id===Number(pForm.cardId)?{...d,remaining:d.remaining+Number(pForm.amount),total:d.total+Number(pForm.amount)}:d));
-    // Gider olarak kaydet
-    setExpenses(p=>[...p,{id:Date.now(),category:pForm.description||"Alışveriş",amount:Number(pForm.amount),date:pForm.date,icon:"🛒",payMethod:"kredi_karti",cardId:Number(pForm.cardId),installments:Number(pForm.installments),installmentAmt}]);
-    setPForm(blankPurchase);setShowPurchase(false);
-  }
-
-  function updateUserPayment(id,val){setDebts(p=>p.map(d=>d.id===id?{...d,userPayment:Math.max(0,Number(val))}:d));}
-
-  function applySmart(){
-    setDebts(p=>p.map(d=>{const s=smart.payments.find(x=>x.id===d.id);return s?{...d,userPayment:s.suggested}:d;}));
-    setSuggApplied(true);setTab("plan");
-  }
-
-  async function getAI(){
-    setAiLoading(true);setAiAdvice(null);
-    const prompt=`Sen bir Türk kişisel finans uzmanısın.\nMAAŞ: ${fmt(salary)} | EK GELİR: ${fmt(thisMonthExtra)} | TOPLAM: ${fmt(totalIncome)}\nBORÇ: ${fmt(totalDebt)} | AYLIK ÖDEME: ${fmt(totalMonthly)} (%${debtRatio})\nGİDER: ${fmt(totalExpenses)} | NET: ${fmt(freeIncome)}\n\nSABİT KREDİLER:\n${debts.filter(d=>d.type==="kredi").map(d=>`- ${d.name}: ${fmt(d.remaining)}, aylık ${fmt(d.monthly)}, %${d.rate}, ${d.months}ay`).join("\n")}\nESNEK:\n${debts.filter(d=>d.type!=="kredi").map(d=>`- ${d.name}: ${fmt(d.remaining)}, aylık ${fmt(d.userPayment||d.monthly)}, %${d.rate}`).join("\n")}\n\n1. Genel durum (1-2 cümle)\n2. Esnek borçlar için önerilen ödeme tutarı\n3. Öncelikli borç sırası\n4. Bitiş tahmini\n5. 3 pratik öneri\n\nTürkçe, net, max 280 kelime.`;
-    try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})});
-      const d=await r.json();setAiAdvice(d.content?.[0]?.text||"Yanıt alınamadı.");
-    }catch{setAiAdvice("Bağlantı hatası.");}
-    setAiLoading(false);
-  }
-
-  // Finansal bağlam özeti (her mesajda sisteme gönderilir)
-  function buildFinContext(){
-    return `[FİNANSAL DURUM ÖZETİ - ${new Date().toLocaleDateString('tr-TR')}]
-Gelir: ${fmt(totalIncome)} (Maaş: ${fmt(salary)}${thisMonthExtra>0?` + Ek: ${fmt(thisMonthExtra)}`:""}))
-Toplam Borç: ${fmt(totalDebt)} | Aylık Ödeme: ${fmt(totalMonthly)} (%${debtRatio} gelir)
-Bu Ay Gider: ${fmt(totalExpenses)} | Net Kalan: ${fmt(freeIncome)}
-Borçlar:
-${debts.map(d=>`  • ${d.name} [${d.type==="kredi"?"Kredi":d.type==="kredi_karti"?"K.Kartı":"KMH"}]: ${fmt(d.remaining)} kalan, %${d.rate} faiz, aylık ${fmt(d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly)}${d.months?`, ${d.months} ay`:""}`).join("\n")}
-${activeRecurring.length>0?`Sabit Giderler: ${activeRecurring.map(r=>`${r.category} ${fmt(r.amount)}`).join(", ")}`:""}`; 
-  }
-
-  async function sendChat(){
-    const msg=chatInput.trim();
-    if(!msg||chatLoading)return;
-    setChatInput("");
-    const userMsg={role:"user",content:msg,time:new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})};
-    const newMessages=[...chatMessages,userMsg];
-    setChatMessages(newMessages);
-    setChatLoading(true);
-    setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
-
-    // Sisteme finansal bağlamı ver, sohbet geçmişini gönder
-    const systemPrompt=`Sen samimi, yardımsever bir Türk kişisel finans danışmanısın. Kullanıcının finansal verilerine erişimin var. Kısa, net, uygulanabilir öneriler ver. Gereksiz tekrar yapma. Türkçe konuş.\n\n${buildFinContext()}`;
-
-    const apiMessages=newMessages.map(m=>({role:m.role,content:m.content}));
-
-    try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:800,
-          system:systemPrompt,
-          messages:apiMessages
-        })
-      });
-      const d=await r.json();
-      const reply=d.content?.[0]?.text||"Yanıt alınamadı.";
-      setChatMessages(prev=>[...prev,{role:"assistant",content:reply,time:new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}]);
-    }catch{
-      setChatMessages(prev=>[...prev,{role:"assistant",content:"Bağlantı hatası, tekrar dene.",time:""}]);
-    }
-    setChatLoading(false);
-    setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
-  }
-
-  // ── EXCEL EXPORT ──────────────────────────────────────────────────────────
-  function exportExcel(){
-    const wb=XLSX.utils.book_new();
-
-    // Sayfa 1: Borçlar
-    const debtRows=[
-      ["BORÇ ADI","TİP","KALAN BORÇ","AYLIK ÖDEME","FAİZ %","KALAN AY","ÖDEME GÜNÜ","KESİM GÜNÜ","SON ÖDEME GÜNÜ"],
-      ...debts.map(d=>[d.name,d.type==="kredi"?"Kredi":d.type==="kredi_karti"?"Kredi Kartı":"KMH",d.remaining,d.type==="kredi"?d.monthly:(d.userPayment||d.monthly),d.rate,d.months||"Esnek",d.payDay||"-",d.kesimGunu||"-",d.sonOdemeGunu||"-"]),
-      [],["TOPLAM","","",totalDebt,"","","","",""],
-    ];
-    const ws1=XLSX.utils.aoa_to_sheet(debtRows);
-    ws1["!cols"]=[{wch:28},{wch:14},{wch:14},{wch:14},{wch:10},{wch:10},{wch:12},{wch:12},{wch:14}];
-    // Header stil
-    ["A1","B1","C1","D1","E1","F1","G1","H1","I1"].forEach(ref=>{
-      if(ws1[ref])ws1[ref].s={font:{bold:true},fill:{fgColor:{rgb:"1A1A2E"}},font:{color:{rgb:"FFFFFF"},bold:true}};
-    });
-    XLSX.utils.book_append_sheet(wb,ws1,"Borçlar");
-
-    // Sayfa 2: Ödeme Planı (ilk 24 ay)
-    const planRows=[["AY","BORÇ ADI","TİP","ÖDEME TARİHİ","ÖDEME TUTARI","FAİZ","ANAPARA","KALAN BORÇ"]];
-    plan.slice(0,24).forEach(mg=>{
-      mg.payments.forEach(p=>{
-        planRows.push([mg.label,p.debtName,p.debtType==="kredi"?"Kredi":p.debtType==="kredi_karti"?"K.Kartı":"KMH",p.date,p.payment,p.interest||"-",p.principal||"-",p.remaining]);
-      });
-      planRows.push(["","","","TOPLAM",mg.total,"","",""]);planRows.push([]);
-    });
-    const ws2=XLSX.utils.aoa_to_sheet(planRows);
-    ws2["!cols"]=[{wch:16},{wch:26},{wch:10},{wch:22},{wch:14},{wch:12},{wch:12},{wch:14}];
-    XLSX.utils.book_append_sheet(wb,ws2,"Ödeme Planı");
-
-    // Sayfa 3: Giderler
-    const expRows=[["TARİH","KATEGORİ","TUTAR","ÖDEME YÖNTEMİ","KART","TAKSİT","TAKSİT TUTARI"]];
-    [...expenses].sort((a,b)=>b.date.localeCompare(a.date)).forEach(e=>{
-      const cardName=e.cardId?debts.find(d=>d.id===e.cardId)?.name||"-":"-";
-      expRows.push([e.date,e.category,e.amount,e.payMethod==="nakit"?"Nakit":"Kredi Kartı",cardName,e.installments||1,e.installmentAmt||e.amount]);
-    });
-    expRows.push([]);expRows.push(["","TOPLAM",expenses.reduce((s,e)=>s+e.amount,0),"","","",""]);
-    const ws3=XLSX.utils.aoa_to_sheet(expRows);
-    ws3["!cols"]=[{wch:14},{wch:18},{wch:12},{wch:16},{wch:26},{wch:8},{wch:14}];
-    XLSX.utils.book_append_sheet(wb,ws3,"Giderler");
-
-    XLSX.writeFile(wb,"Finans_Takibim.xlsx");
-  }
-
-  // ── STYLES ───────────────────────────────────────────────────────────────
-  const inp={width:"100%",padding:"10px 12px",border:"1.5px solid #e8ecf0",borderRadius:10,fontSize:14,fontFamily:"'Sora',sans-serif",outline:"none",boxSizing:"border-box",marginBottom:8,background:"#fff"};
-  const btnP={width:"100%",padding:"12px",background:"#c0392b",color:"#fff",border:"none",borderRadius:12,fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Sora',sans-serif"};
-  const btnS=(bg="#16a085")=>({...btnP,background:bg});
-
-  const pieData=debts.map(d=>({name:d.name,value:d.remaining}));
-  const chartData=Array.from({length:6},(_,i)=>{const m=new Date(2026,2+i,1);return{label:MONTHS[m.getMonth()].slice(0,3),value:Math.max(0,Math.round((totalDebt-totalMonthly*(i+1)*1.05)/1000))};});
-  const catData=CATS.map(c=>({name:c.name,tutar:allExpenses.filter(e=>e.category===c.name).reduce((s,e)=>s+e.amount,0)})).filter(c=>c.tutar>0);
-
-  // ── RENDER ───────────────────────────────────────────────────────────────
-  return <>
-    <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap');
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{background:#f2f4f8;font-family:'Sora',sans-serif}
-      ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
-      .slide-in{animation:si .25s ease}
-      @keyframes si{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
-      .pulse{animation:pu 2s infinite}@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
-      .hover-row:hover{background:#fafafa!important}
-      input[type=number]::-webkit-inner-spin-button{opacity:.4}
-      select{appearance:auto}
-    `}</style>
-
-    <div style={{maxWidth:430,margin:"0 auto",minHeight:"100vh",background:"#f2f4f8",paddingBottom:90}}>
-
-      {/* ── HEADER ─────────────────────────────────────────────────────── */}
-      <div style={{background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#c0392b 100%)",padding:"20px 16px 24px",color:"#fff"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <div>
-            <div style={{fontSize:11,opacity:.65,marginBottom:2}}>Hoş geldin 👋</div>
-            <div style={{fontSize:17,fontWeight:800}}>Finans Takibim</div>
-          </div>
-          <button onClick={exportExcel} style={{background:"rgba(255,255,255,.18)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
-            📊 Excel'e Aktar
-          </button>
-        </div>
-
-        {/* Kart uyarıları */}
-        {cardAlerts.map(a=>(
-          <div key={a.id} style={{background:"rgba(255,200,0,.2)",border:"1px solid rgba(255,200,0,.4)",borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:11}}>
-            ⚠️ <strong>{a.name}</strong> son ödeme {a.diffDays===0?"BUGÜN":a.diffDays+" gün sonra"} ({a.son.toLocaleDateString("tr-TR")})
-          </div>
-        ))}
-
-        <div style={{display:"flex",gap:8,marginBottom:12}}>
-          <div style={{flex:1,background:"rgba(255,255,255,.1)",borderRadius:14,padding:"10px 12px"}}>
-            <div style={{fontSize:10,opacity:.65}}>Toplam Gelir</div>
-            <div style={{fontSize:18,fontWeight:800}}>{fmt(totalIncome)}</div>
-            {thisMonthExtra>0&&<div style={{fontSize:9,marginTop:2,color:"#a8f0c6"}}>+Ek {fmt(thisMonthExtra)}</div>}
-          </div>
-          <div style={{flex:1,background:freeIncome>=0?"rgba(46,204,113,.2)":"rgba(231,76,60,.35)",borderRadius:14,padding:"10px 12px",border:freeIncome<0?"1px solid rgba(231,76,60,.5)":"none"}}>
-            <div style={{fontSize:10,opacity:.65}}>Net Kalan</div>
-            <div style={{fontSize:18,fontWeight:800,color:freeIncome<0?"#ff9090":"#a8f0c6"}}>{fmt(freeIncome)}</div>
-          </div>
-        </div>
-        <div style={{background:"rgba(255,255,255,.1)",borderRadius:12,padding:"10px 12px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-            <span style={{fontSize:11,opacity:.75}}>Borç / Gelir Oranı</span>
-            <span style={{fontSize:11,fontWeight:700,color:debtRatio>50?"#ff9090":debtRatio>35?"#ffd080":"#a8f0c6"}}>%{debtRatio}</span>
-          </div>
-          <div style={{background:"rgba(255,255,255,.15)",borderRadius:99,height:6,overflow:"hidden"}}>
-            <div style={{width:`${Math.min(debtRatio,100)}%`,height:"100%",background:debtRatio>50?"#e74c3c":debtRatio>35?"#f39c12":"#2ecc71",borderRadius:99,transition:"width .8s"}}/>
-          </div>
-          <div style={{fontSize:10,opacity:.55,marginTop:4}}>{debtRatio>50?"⚠️ Kritik!":debtRatio>35?"⚡ Dikkat":"✅ Yönetilebilir"}</div>
-        </div>
-      </div>
-
-      {/* ── TABS ───────────────────────────────────────────────────────── */}
-      <div style={{background:"#fff",display:"flex",borderBottom:"1px solid #f0f0f0",position:"sticky",top:0,zIndex:10,overflowX:"auto"}}>
-        <Tab label="📊 Özet"     active={tab==="ozet"}     onClick={()=>setTab("ozet")}/>
-        <Tab label="💰 Gelirler" active={tab==="gelirler"} onClick={()=>setTab("gelirler")}/>
-        <Tab label="💳 Borçlar"  active={tab==="borclar"}  onClick={()=>setTab("borclar")} badge={debts.length}/>
-        <Tab label="💸 Giderler" active={tab==="giderler"} onClick={()=>setTab("giderler")}/>
-        <Tab label="💡 Öneri"    active={tab==="oneri"}    onClick={()=>setTab("oneri")}/>
-        <Tab label="📅 Plan"     active={tab==="plan"}     onClick={()=>setTab("plan")}/>
-        <Tab label="📋 Rapor"    active={tab==="rapor"}    onClick={()=>setTab("rapor")}/>
-        <Tab label="🤖 AI"       active={tab==="ai"}       onClick={()=>setTab("ai")}/>
-      </div>
-
-      <div style={{padding:"14px 13px"}} className="slide-in">
-
-        {/* ══ ÖZET ═══════════════════════════════════════════════════════ */}
-        {tab==="ozet"&&<>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>Borç Dağılımı</div>
-            <PieChart data={pieData} colors={COLORS}/>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
-              {debts.map((d,i)=><div key={d.id} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:COLORS[i%COLORS.length]}}/>
-                <span style={{color:"#666"}}>{d.name.split(" ").slice(0,3).join(" ")}</span>
-              </div>)}
-            </div>
-          </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>6 Aylık Borç Tahmini</div>
-            <LineChartSimple data={chartData}/>
-          </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>Bu Ay Özeti</div>
-            {[["Toplam Gelir",fmt(totalIncome),"#27ae60"],["Borç Ödemesi",`-${fmt(totalMonthly)}`,"#e67e22"],["Giderler",`-${fmt(totalExpenses)}`,"#3498db"],["Net Kalan",fmt(freeIncome),freeIncome>=0?"#27ae60":"#e74c3c"]].map(([l,v,c])=>(
-              <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <span style={{fontSize:13,color:l==="Net Kalan"?"#1a1a2e":"#666",fontWeight:l==="Net Kalan"?700:400}}>{l}</span>
-                <span style={{fontSize:13,fontWeight:700,color:c}}>{v}</span>
-              </div>
-            ))}
-          </Card>
-          {/* Kredi kartı kesim/son ödeme özeti */}
-          {creditCards.some(c=>c.kesimGunu)&&<Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>🗓 Kredi Kartı Tarihleri</div>
-            {creditCards.map(c=>(
-              <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <div>
-                  <div style={{fontSize:12,fontWeight:600}}>{c.name}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>
-                    {c.kesimGunu?`Kesim: Ayın ${c.kesimGunu}.`:""} {c.sonOdemeGunu?`Son Ödeme: Ayın ${c.sonOdemeGunu}.`:""}
-                  </div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>{fmt(c.userPayment||c.monthly)}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>aylık ödeme</div>
-                </div>
-              </div>
-            ))}
-          </Card>}
-          <div style={{textAlign:"right",marginBottom:12}}>
-            <span onClick={exportExcel} style={{fontSize:12,color:"#27ae60",cursor:"pointer",fontWeight:600}}>📊 Excel'e Aktar →</span>
-          </div>
-        </>}
-
-        {/* ══ GELİRLER ════════════════════════════════════════════════════ */}
-        {tab==="gelirler"&&<>
-          <Card style={{background:"linear-gradient(135deg,#0d6e5a,#16a085)",color:"#fff",padding:"16px"}}>
-            <div style={{fontSize:11,opacity:.75,marginBottom:4}}>Bu Ay Toplam Gelir</div>
-            <div style={{fontSize:28,fontWeight:800,marginBottom:12}}>{fmt(totalIncome)}</div>
-            <div style={{display:"flex",gap:8}}>
-              {[["Maaş",fmt(salary)],["Ek Gelirler",fmt(thisMonthExtra)]].map(([l,v])=>(
-                <div key={l} style={{flex:1,background:"rgba(255,255,255,.15)",borderRadius:12,padding:"10px 12px"}}>
-                  <div style={{fontSize:10,opacity:.75}}>{l}</div><div style={{fontSize:16,fontWeight:800}}>{v}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:10}}>🏛 Aylık Maaş</div>
-            <div style={{display:"flex",gap:8}}>
-              <input type="number" value={salaryInput} onChange={e=>setSalaryInput(e.target.value)} style={{...inp,marginBottom:0,flex:1,fontSize:15,fontWeight:700}} placeholder="Aylık net maaş"/>
-              <button onClick={()=>setSalary(Number(salaryInput))} style={{...btnS("#16a085"),width:"auto",padding:"10px 16px",fontSize:13}}>Kaydet</button>
-            </div>
-          </Card>
-          <Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div><div style={{fontSize:13,fontWeight:700}}>💰 Ek Gelirlerim</div><div style={{fontSize:10,color:"#aaa"}}>İkramiye, fazla mesai, kira vb.</div></div>
-              <button onClick={()=>setShowAddIncome(!showAddIncome)} style={{...btnS("#16a085"),width:"auto",padding:"7px 13px",fontSize:12}}>+ Ekle</button>
-            </div>
-            {showAddIncome&&<div style={{background:"#f0fffe",border:"1.5px dashed #16a085",borderRadius:12,padding:"13px",marginBottom:12}}>
-              <input style={inp} placeholder="Gelir adı" value={iForm.label} onChange={e=>setIForm({...iForm,label:e.target.value})}/>
-              <input style={inp} type="number" placeholder="Tutar (₺)" value={iForm.amount} onChange={e=>setIForm({...iForm,amount:e.target.value})}/>
-              <input style={inp} type="date" value={iForm.date} onChange={e=>setIForm({...iForm,date:e.target.value})}/>
-              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:8,cursor:"pointer"}}>
-                <input type="checkbox" checked={iForm.recurring} onChange={e=>setIForm({...iForm,recurring:e.target.checked})} style={{accentColor:"#16a085"}}/>
-                Her ay tekrarlanır
-              </label>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{if(!iForm.label||!iForm.amount)return;setIncomes(p=>[...p,{id:Date.now(),...iForm,amount:Number(iForm.amount)}]);setIForm({label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:false});setShowAddIncome(false);}} style={btnS("#16a085")}>Kaydet</button>
-                <button onClick={()=>setShowAddIncome(false)} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
-              </div>
-            </div>}
-            {incomes.length===0&&<div style={{textAlign:"center",padding:"16px",color:"#ccc",fontSize:13}}>Henüz ek gelir yok</div>}
-            {incomes.filter(e=>e.recurring).length>0&&<><div style={{fontSize:10,fontWeight:700,color:"#888",marginBottom:6}}>🔄 TEKRARLAYAN</div>
-              {incomes.filter(e=>e.recurring).map(e=>(
-                <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",borderRadius:11,marginBottom:6,background:"#f0fffe",border:"1px solid #b2dfdb"}}>
-                  <div style={{fontSize:20}}>🔄</div>
-                  <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>{e.label}</div><div style={{fontSize:10,color:"#16a085"}}>Her ay</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:800,color:"#16a085"}}>{fmt(e.amount)}</div>
-                  <button onClick={()=>setIncomes(p=>p.filter(x=>x.id!==e.id))} style={{fontSize:10,color:"#ccc",background:"none",border:"none",cursor:"pointer"}}>✕</button></div>
-                </div>
-              ))}</>}
-            {incomes.filter(e=>!e.recurring).length>0&&<><div style={{fontSize:10,fontWeight:700,color:"#888",marginBottom:6,marginTop:8}}>💵 TEK SEFERLİK</div>
-              {incomes.filter(e=>!e.recurring).map(e=>{
-                const active=e.date.slice(0,7)===curMonth;
-                return <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",borderRadius:11,marginBottom:6,background:active?"#f0fffe":"#fafafa",border:active?"1px solid #b2dfdb":"1px solid #eee"}}>
-                  <div style={{fontSize:20}}>💵</div>
-                  <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>{e.label}</div><div style={{fontSize:10,color:"#aaa"}}>{new Date(e.date).toLocaleDateString("tr-TR")}{active&&<span style={{color:"#16a085",marginLeft:6,fontWeight:600}}>• Bu ay</span>}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:800,color:active?"#16a085":"#999"}}>{fmt(e.amount)}</div>
-                  <button onClick={()=>setIncomes(p=>p.filter(x=>x.id!==e.id))} style={{fontSize:10,color:"#ccc",background:"none",border:"none",cursor:"pointer"}}>✕</button></div>
-                </div>;
-              })}</>}
-            {thisMonthExtra>0&&<div style={{marginTop:10,padding:"10px 12px",background:"#e8f8f5",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
-              <span style={{fontSize:12,color:"#0d6e5a",fontWeight:600}}>Bu ay toplam ek gelir</span>
-              <span style={{fontSize:14,fontWeight:800,color:"#16a085"}}>{fmt(thisMonthExtra)}</span>
-            </div>}
-          </Card>
-          {totalIncome>0&&<Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>📊 Gelir Kullanımı</div>
-            {[["Borç Ödemeleri",totalMonthly,"#e74c3c"],["Giderler",totalExpenses,"#3498db"],["Net Kalan",Math.max(0,freeIncome),"#27ae60"]].map(([l,v,c])=>{
-              const pct=Math.round((v/totalIncome)*100);
-              return <div key={l} style={{marginBottom:10}}>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
-                  <span style={{color:"#555"}}>{l}</span><span style={{fontWeight:700,color:c}}>{fmt(v)} <span style={{color:"#aaa",fontWeight:400}}>(%{pct})</span></span>
-                </div>
-                <div style={{background:"#f5f5f5",borderRadius:99,height:7,overflow:"hidden"}}>
-                  <div style={{width:`${Math.min(pct,100)}%`,height:"100%",background:c,borderRadius:99,transition:"width .6s"}}/>
-                </div>
-              </div>;
-            })}
-          </Card>}
-        </>}
-
-        {/* ══ BORÇLAR ══════════════════════════════════════════════════════ */}
-        {tab==="borclar"&&<>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div style={{fontSize:13,color:"#666"}}>Toplam: <strong style={{color:"#1a1a2e"}}>{fmt(totalDebt)}</strong></div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{setShowPurchase(true);}} style={{...btnS("#e67e22"),width:"auto",padding:"7px 12px",fontSize:11}}>🛒 Alışveriş</button>
-              <button onClick={()=>{setEditDebtId(null);setDForm(blankDebt);setShowAddDebt(!showAddDebt);}} style={{...btnP,width:"auto",padding:"7px 13px",fontSize:12}}>+ Borç Ekle</button>
-            </div>
-          </div>
-
-          {/* Kart alışverişi modalı */}
-          {showPurchase&&<Card style={{border:"2px dashed #e67e22"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#e67e22"}}>🛒 Kart ile Alışveriş</div>
-            <div style={{fontSize:11,color:"#888",marginBottom:10}}>Tutar kart borcuna eklenecek, gider olarak kaydedilecek</div>
-            <select style={inp} value={pForm.cardId} onChange={e=>setPForm({...pForm,cardId:e.target.value})}>
-              <option value="">Kart seç...</option>
-              {creditCards.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            <input style={inp} placeholder="Açıklama (örn: Teknosa TV)" value={pForm.description} onChange={e=>setPForm({...pForm,description:e.target.value})}/>
-            <input style={inp} type="number" placeholder="Toplam tutar (₺)" value={pForm.amount} onChange={e=>setPForm({...pForm,amount:e.target.value})}/>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:"#888",marginBottom:4}}>Taksit sayısı</div>
-                <select style={{...inp,marginBottom:0}} value={pForm.installments} onChange={e=>setPForm({...pForm,installments:Number(e.target.value)})}>
-                  {[1,2,3,4,6,9,12,18,24].map(n=><option key={n} value={n}>{n===1?"Tek Çekim":`${n} Taksit`}</option>)}
-                </select>
-              </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:"#888",marginBottom:4}}>Aylık taksit</div>
-                <div style={{...inp,marginBottom:0,background:"#f5f5f5",color:"#555",display:"flex",alignItems:"center"}}>
-                  {pForm.amount&&pForm.installments>1?fmt(Math.round(Number(pForm.amount)/pForm.installments)):"—"}
-                </div>
-              </div>
-            </div>
-            <input style={inp} type="date" value={pForm.date} onChange={e=>setPForm({...pForm,date:e.target.value})}/>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={savePurchase} style={btnS("#e67e22")}>Ekle</button>
-              <button onClick={()=>setShowPurchase(false)} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
-            </div>
-          </Card>}
-
-          {/* Borç ekleme/düzenleme formu */}
-          {showAddDebt&&<Card style={{border:"2px dashed #c0392b"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#c0392b"}}>{editDebtId?"✏️ Borcu Düzenle":"➕ Yeni Borç"}</div>
-            <input style={inp} placeholder="Borç adı" value={dForm.name} onChange={e=>setDForm({...dForm,name:e.target.value})}/>
-            <select style={inp} value={dForm.type} onChange={e=>setDForm({...dForm,type:e.target.value})}>
-              <option value="kredi">Kredi (Sabit Taksit)</option>
-              <option value="kredi_karti">Kredi Kartı (Esnek)</option>
-              <option value="kmh">KMH (Esnek)</option>
-            </select>
-            <input style={inp} type="number" placeholder="Kalan borç (₺)" value={dForm.remaining} onChange={e=>setDForm({...dForm,remaining:e.target.value})}/>
-            {dForm.type==="kredi"
-              ?<input style={inp} type="number" placeholder="Sabit aylık taksit (₺)" value={dForm.monthly} onChange={e=>setDForm({...dForm,monthly:e.target.value})}/>
-              :<input style={inp} type="number" placeholder="Aylık ödeme tutarın (₺)" value={dForm.userPayment} onChange={e=>setDForm({...dForm,userPayment:e.target.value})}/>
-            }
-            <input style={inp} type="number" placeholder="Aylık faiz oranı (%)" value={dForm.rate} onChange={e=>setDForm({...dForm,rate:e.target.value})}/>
-            {dForm.type==="kredi"&&<input style={inp} type="number" placeholder="Kalan ay sayısı" value={dForm.months} onChange={e=>setDForm({...dForm,months:e.target.value})}/>}
-            <input style={inp} type="number" placeholder="Ödeme günü (ayın kaçı?)" value={dForm.payDay} onChange={e=>setDForm({...dForm,payDay:e.target.value})}/>
-            {dForm.type==="kredi_karti"&&<>
-              <div style={{fontSize:11,color:"#e67e22",fontWeight:600,marginBottom:4}}>📅 Hesap Kesim & Son Ödeme</div>
-              <div style={{display:"flex",gap:8}}>
-                <input style={{...inp,flex:1}} type="number" placeholder="Kesim günü" value={dForm.kesimGunu} onChange={e=>setDForm({...dForm,kesimGunu:e.target.value})}/>
-                <input style={{...inp,flex:1}} type="number" placeholder="Son ödeme günü" value={dForm.sonOdemeGunu} onChange={e=>setDForm({...dForm,sonOdemeGunu:e.target.value})}/>
-              </div>
-            </>}
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={saveDebt} style={btnP}>{editDebtId?"Güncelle":"Ekle"}</button>
-              <button onClick={()=>{setShowAddDebt(false);setEditDebtId(null);setDForm(blankDebt);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
-              {editDebtId&&<button onClick={()=>deleteDebt(editDebtId)} style={{...btnP,background:"#fadbd8",color:"#c0392b",width:"auto",padding:"12px 14px"}}>🗑</button>}
-            </div>
-          </Card>}
-
-          {debts.map((d,i)=>{
-            const isFlx=d.type!=="kredi";
-            const pl=isFlx?buildFlexPlan(d):buildFixedPlan(d);
-            const pct=Math.round((1-d.remaining/d.total)*100);
-            return <Card key={d.id}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                <div>
-                  <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:4}}>{d.name}</div>
-                  <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
-                    <TBadge type={d.type}/>
-                    <span style={{fontSize:10,background:isFlx?"#e8f5e9":"#e3f2fd",color:isFlx?"#2e7d32":"#1565c0",borderRadius:20,padding:"2px 8px",fontWeight:600}}>{isFlx?"Esnek":"Sabit"}</span>
-                    {d.type==="kredi_karti"&&d.sonOdemeGunu&&<span style={{fontSize:10,background:"#fff8e1",color:"#e65100",borderRadius:20,padding:"2px 8px",fontWeight:600}}>Son: {d.sonOdemeGunu}. gün</span>}
-                  </div>
-                </div>
-                <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                  <div style={{textAlign:"right"}}><div style={{fontSize:15,fontWeight:800,color:"#c0392b"}}>{fmt(d.remaining)}</div><div style={{fontSize:10,color:"#999"}}>kalan</div></div>
-                  <div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>startEdit(d)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"4px 10px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>✏️ Düzenle</button>
-                    <button onClick={()=>deleteDebt(d.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"4px 8px",fontSize:11,cursor:"pointer"}}>🗑</button>
-                  </div>
-                </div>
-              </div>
-              <div style={{background:"#f5f5f5",borderRadius:99,height:5,overflow:"hidden",marginBottom:7}}>
-                <div style={{width:`${Math.max(pct,2)}%`,height:"100%",background:COLORS[i%COLORS.length],borderRadius:99}}/>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#888",marginBottom:isFlx?10:0}}>
-                <span>%{d.rate} faiz</span>
-                <span>Aylık {fmt(isFlx?(d.userPayment||d.monthly):d.monthly)}</span>
-                <span>{pl.length} ay</span>
-              </div>
-              {isFlx&&<div style={{borderTop:"1px solid #f0f0f0",paddingTop:10,display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:12,color:"#555",whiteSpace:"nowrap"}}>Aylık ödemen:</span>
-                <input type="number" value={d.userPayment||d.monthly} onChange={e=>updateUserPayment(d.id,e.target.value)} style={{...inp,marginBottom:0,flex:1,textAlign:"right",fontWeight:700,fontSize:13}}/>
-                <span style={{fontSize:12,color:"#aaa"}}>₺</span>
-              </div>}
-              {d.type==="kredi_karti"&&(d.kesimGunu||d.sonOdemeGunu)&&<div style={{marginTop:8,padding:"6px 8px",background:"#fff8e1",borderRadius:8,fontSize:11,color:"#e65100"}}>
-                {d.kesimGunu?`📋 Kesim: Ayın ${d.kesimGunu}. günü`:""}  {d.sonOdemeGunu?`💳 Son Ödeme: Ayın ${d.sonOdemeGunu}. günü`:""}
-              </div>}
-            </Card>;
-          })}
-        </>}
-
-        {/* ══ GİDERLER ════════════════════════════════════════════════════ */}
-        {tab==="giderler"&&<>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-            <div style={{fontSize:13,color:"#666"}}>Bu ay: <strong style={{color:"#1a1a2e"}}>{fmt(totalExpenses)}</strong></div>
-            <div style={{display:"flex",gap:6}}>
-              <button onClick={()=>setShowAddRecurring(!showAddRecurring)} style={{...btnS("#8e44ad"),width:"auto",padding:"7px 10px",fontSize:11}}>🔄 Sabit</button>
-              <button onClick={()=>setShowAddExp(!showAddExp)} style={{...btnP,width:"auto",padding:"7px 11px",fontSize:11}}>+ Ekle</button>
-            </div>
-          </div>
-
-          {/* Özel kategori ekleme */}
-          {showAddCat&&<Card style={{border:"2px dashed #8e44ad"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"#8e44ad"}}>📁 Yeni Kategori</div>
-            <div style={{display:"flex",gap:8,marginBottom:8}}>
-              <input style={{...inp,marginBottom:0,flex:1}} placeholder="Kategori adı (örn: Ev Kirası)" value={catForm.name} onChange={e=>setCatForm({...catForm,name:e.target.value})}/>
-              <select style={{...inp,marginBottom:0,width:70}} value={catForm.icon} onChange={e=>setCatForm({...catForm,icon:e.target.value})}>
-                {ICONS.map(i=><option key={i} value={i}>{i}</option>)}
-              </select>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={saveCustomCat} style={btnS("#8e44ad")}>Ekle</button>
-              <button onClick={()=>setShowAddCat(false)} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
-            </div>
-          </Card>}
-
-          {/* Sabit/Tekrarlayan gider formu */}
-          {showAddRecurring&&<Card style={{border:"2px dashed #8e44ad"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#8e44ad"}}>{editRecurringId?"✏️ Sabit Gideri Düzenle":"🔄 Yeni Sabit/Tekrarlayan Gider"}</div>
-            <div style={{fontSize:11,color:"#888",marginBottom:8}}>Kira, abonelik, aidat gibi her ay otomatik eklenen giderler</div>
-
-            {/* Kategori seç veya yeni ekle */}
-            <div style={{display:"flex",gap:6,marginBottom:8}}>
-              <select style={{...inp,marginBottom:0,flex:1}} value={rForm.category} onChange={e=>{
-                const cat=CATS.find(c=>c.name===e.target.value);
-                setRForm({...rForm,category:e.target.value,icon:cat?.icon||"📌"});
-              }}>
-                <option value="">Kategori seç...</option>
-                {CATS.map(c=><option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
-                <option value="__new__">+ Yeni kategori ekle</option>
-              </select>
-              <select style={{...inp,marginBottom:0,width:70}} value={rForm.icon} onChange={e=>setRForm({...rForm,icon:e.target.value})}>
-                {ICONS.map(i=><option key={i} value={i}>{i}</option>)}
-              </select>
-            </div>
-            {rForm.category==="__new__"&&<input style={inp} placeholder="Yeni kategori adı" value={rForm.customCatName||""} onChange={e=>setRForm({...rForm,customCatName:e.target.value,category:e.target.value})}/>}
-
-            <input style={inp} type="number" placeholder="Aylık tutar (₺)" value={rForm.amount} onChange={e=>setRForm({...rForm,amount:e.target.value})}/>
-            <div style={{display:"flex",gap:8}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:"#888",marginBottom:4}}>Her ayın kaçında?</div>
-                <input style={{...inp,marginBottom:0}} type="number" min="1" max="31" placeholder="Gün (1-31)" value={rForm.dayOfMonth} onChange={e=>setRForm({...rForm,dayOfMonth:e.target.value})}/>
-              </div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:11,color:"#888",marginBottom:4}}>Başlangıç tarihi</div>
-                <input style={{...inp,marginBottom:0}} type="date" value={rForm.startDate} onChange={e=>setRForm({...rForm,startDate:e.target.value})}/>
-              </div>
-            </div>
-            <div style={{marginTop:8,marginBottom:8}}>
-              <div style={{fontSize:11,color:"#888",marginBottom:4}}>Kaç ay sürecek?</div>
-              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-                {[3,6,12,24,36,60].map(n=>(
-                  <button key={n} onClick={()=>setRForm({...rForm,totalMonths:n})} style={{padding:"6px 12px",border:`2px solid ${rForm.totalMonths===n?"#8e44ad":"#e0e0e0"}`,borderRadius:8,background:rForm.totalMonths===n?"#f3e8fd":"#fff",color:rForm.totalMonths===n?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                    {n} ay
-                  </button>
-                ))}
-                <input type="number" placeholder="Diğer" style={{...inp,marginBottom:0,width:70,fontSize:12}} value={[3,6,12,24,36,60].includes(rForm.totalMonths)?"":(rForm.totalMonths||"")} onChange={e=>setRForm({...rForm,totalMonths:Number(e.target.value)})}/>
-              </div>
-              {rForm.amount&&rForm.totalMonths&&<div style={{marginTop:6,fontSize:11,color:"#8e44ad",fontWeight:600}}>
-                Toplam: {fmt(Number(rForm.amount)*Number(rForm.totalMonths))} ({rForm.totalMonths} ay × {fmt(Number(rForm.amount))})
-              </div>}
-            </div>
-            <input style={inp} placeholder="Not (isteğe bağlı: örn. Yıllık kira sözleşmesi)" value={rForm.note} onChange={e=>setRForm({...rForm,note:e.target.value})}/>
-
-            <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>💳 Ödeme Yöntemi</div>
-            <div style={{display:"flex",gap:6,marginBottom:8}}>
-              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setRForm({...rForm,payMethod:v,cardId:""})} style={{flex:1,padding:"7px",border:`2px solid ${rForm.payMethod===v?"#8e44ad":"#e0e0e0"}`,borderRadius:10,background:rForm.payMethod===v?"#f3e8fd":"#fff",color:rForm.payMethod===v?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>{l}</button>
-              ))}
-            </div>
-            {rForm.payMethod==="kredi_karti"&&<select style={inp} value={rForm.cardId} onChange={e=>setRForm({...rForm,cardId:e.target.value})}>
-              <option value="">Kart seç...</option>
-              {creditCards.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>}
-
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={saveRecurring} style={btnS("#8e44ad")}>{editRecurringId?"Güncelle":"Kaydet"}</button>
-              <button onClick={()=>{setShowAddRecurring(false);setEditRecurringId(null);setRForm(blankRecurring);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
-            </div>
-          </Card>}
-
-          {/* Aktif sabit giderler özeti */}
-          {activeRecurring.length>0&&<Card style={{border:"1px solid #e8d5f5"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div><div style={{fontSize:13,fontWeight:700,color:"#8e44ad"}}>🔄 Sabit Giderlerim</div>
-              <div style={{fontSize:10,color:"#aaa"}}>Bu ay otomatik eklendi</div></div>
-              <div style={{fontSize:14,fontWeight:800,color:"#8e44ad"}}>{fmt(activeRecurring.reduce((s,r)=>s+r.amount,0))}</div>
-            </div>
-            {recurringExp.map(r=>{
-              const start=new Date(r.startDate);
-              const startMonth=start.getFullYear()*12+start.getMonth();
-              const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
-              const elapsed=nowMonth-startMonth;
-              const remaining=r.totalMonths-elapsed;
-              const isActive=elapsed>=0&&elapsed<r.totalMonths;
-              return <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,marginBottom:6,background:isActive?"#f9f0ff":"#fafafa",border:isActive?"1px solid #d7bef5":"1px solid #eee",opacity:isActive?1:0.5}}>
-                <div style={{fontSize:20}}>{r.icon}</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:700}}>{r.category}</div>
-                  <div style={{fontSize:10,color:"#888"}}>Her ayın {r.dayOfMonth}. · {isActive?`${elapsed+1}/${r.totalMonths} ay · ${remaining} ay kaldı`:"Tamamlandı"}</div>
-                  {r.note&&<div style={{fontSize:10,color:"#b39ddb",fontStyle:"italic"}}>{r.note}</div>}
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(r.amount)}</div>
-                  <div style={{display:"flex",gap:4,marginTop:3}}>
-                    <button onClick={()=>{setRForm({category:r.category,icon:r.icon,amount:r.amount,dayOfMonth:r.dayOfMonth,startDate:r.startDate,totalMonths:r.totalMonths,payMethod:r.payMethod,cardId:r.cardId||"",note:r.note||""});setEditRecurringId(r.id);setShowAddRecurring(true);}} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>✏️</button>
-                    <button onClick={()=>deleteRecurring(r.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>🗑</button>
-                  </div>
-                </div>
-              </div>;
-            })}
-          </Card>}
-
-          {showAddExp&&<Card style={{border:"2px dashed #e0e0e0"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>{editExpId?"✏️ Gideri Düzenle":"➕ Yeni Gider"}</div>
-            <select style={inp} value={eForm.category} onChange={e=>setEForm({...eForm,category:e.target.value})}>
-              {CATS.map(c=><option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
-            </select>
-            <input style={inp} type="number" placeholder="Tutar (₺)" value={eForm.amount} onChange={e=>setEForm({...eForm,amount:e.target.value})}/>
-            <input style={inp} type="date" value={eForm.date} onChange={e=>setEForm({...eForm,date:e.target.value})}/>
-
-            {/* Ödeme yöntemi */}
-            <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>💳 Ödeme Yöntemi</div>
-            <div style={{display:"flex",gap:6,marginBottom:8}}>
-              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setEForm({...eForm,payMethod:v,cardId:"",installments:1})} style={{flex:1,padding:"8px",border:`2px solid ${eForm.payMethod===v?"#c0392b":"#e0e0e0"}`,borderRadius:10,background:eForm.payMethod===v?"#fdf0f0":"#fff",color:eForm.payMethod===v?"#c0392b":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                  {l}
-                </button>
-              ))}
-            </div>
-
-            {eForm.payMethod==="kredi_karti"&&<>
-              <select style={inp} value={eForm.cardId} onChange={e=>setEForm({...eForm,cardId:e.target.value})}>
-                <option value="">Kart seç...</option>
-                {creditCards.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <div style={{display:"flex",gap:8}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:11,color:"#888",marginBottom:4}}>Taksit</div>
-                  <select style={{...inp,marginBottom:0}} value={eForm.installments} onChange={e=>setEForm({...eForm,installments:Number(e.target.value)})}>
-                    {[1,2,3,4,6,9,12,18,24].map(n=><option key={n} value={n}>{n===1?"Tek Çekim":`${n} Taksit`}</option>)}
-                  </select>
-                </div>
-                {eForm.installments>1&&eForm.amount&&<div style={{flex:1}}>
-                  <div style={{fontSize:11,color:"#888",marginBottom:4}}>Aylık</div>
-                  <div style={{...inp,marginBottom:0,background:"#f5f5f5",color:"#27ae60",fontWeight:700,display:"flex",alignItems:"center"}}>
-                    {fmt(Math.round(Number(eForm.amount)/eForm.installments))}
-                  </div>
-                </div>}
-              </div>
-            </>}
-            <div style={{marginTop:8,display:"flex",gap:8}}>
-              <button onClick={saveExpense} style={btnP}>{editExpId?"Güncelle":"Kaydet"}</button>
-              <button onClick={()=>{setShowAddExp(false);setEditExpId(null);setEForm(blankExp);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
-            </div>
-          </Card>}
-
-          {catData.length>0&&<Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700}}>Kategorilere Göre</div>
-              <button onClick={()=>setShowAddCat(!showAddCat)} style={{fontSize:11,color:"#8e44ad",background:"#f3e8fd",border:"1px solid #d7bef5",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>+ Kategori</button>
-            </div>
-            <BarChartH data={catData.map(c=>({label:c.name,value:c.tutar}))} color="#c0392b"/>
-          </Card>}
-
-          {[...allExpenses].sort((a,b)=>b.date.localeCompare(a.date)).map(e=>{
-            const card=e.cardId?debts.find(d=>d.id===e.cardId):null;
-            const cat=CATS.find(c=>c.name===e.category);
-            return <Card key={e.id} style={{padding:"11px 13px",border:e.isRecurring?"1px solid #e8d5f5":"none"}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                  <div style={{fontSize:22,marginTop:2}}>{cat?.icon||e.icon||"📌"}</div>
-                  <div>
-                    <div style={{fontSize:13,fontWeight:600}}>{e.category}</div>
-                    <div style={{fontSize:10,color:"#aaa"}}>{new Date(e.date).toLocaleDateString("tr-TR")}</div>
-                    <div style={{display:"flex",gap:4,marginTop:3,flexWrap:"wrap"}}>
-                      {e.isRecurring&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>🔄 Sabit</span>}
-                      <span style={{fontSize:10,background:e.payMethod==="nakit"?"#e8f5e9":"#fff8e1",color:e.payMethod==="nakit"?"#2e7d32":"#e65100",borderRadius:20,padding:"1px 7px",fontWeight:600}}>
-                        {e.payMethod==="nakit"?"💵 Nakit":"💳 Kart"}
-                      </span>
-                      {card&&<span style={{fontSize:10,background:"#f3e8fd",color:"#8e44ad",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{card.name.split(" ").slice(-1)[0]}</span>}
-                      {e.installments>1&&<span style={{fontSize:10,background:"#e3f2fd",color:"#1565c0",borderRadius:20,padding:"1px 7px",fontWeight:600}}>{e.installments} Taksit</span>}
-                    </div>
-                    {e.note&&<div style={{fontSize:10,color:"#b39ddb",marginTop:2,fontStyle:"italic"}}>{e.note}</div>}
-                  </div>
-                </div>
-                <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:6}}>
-                  <div>
-                    <div style={{fontSize:14,fontWeight:800,color:"#1a1a2e"}}>{fmt(e.amount)}</div>
-                    {e.installments>1&&e.installmentAmt&&<div style={{fontSize:10,color:"#888"}}>{fmt(e.installmentAmt)}/ay</div>}
-                  </div>
-                  {!e.isRecurring&&<div style={{display:"flex",gap:5}}>
-                    <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️</button>
-                    <button onClick={()=>deleteExp(e.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer"}}>🗑</button>
-                  </div>}
-                </div>
-              </div>
-            </Card>;
-          })}
-
-          <button onClick={exportExcel} style={{...btnS("#27ae60"),marginTop:4}}>📊 Giderleri Excel'e Aktar</button>
-        </>}
-
-        {/* ══ ÖDEME ÖNERİSİ ════════════════════════════════════════════════ */}
-        {tab==="oneri"&&<>
-          <Card style={{background:"linear-gradient(135deg,#c0392b,#922b21)",color:"#fff",padding:"18px 16px"}}>
-            <div style={{fontSize:22,marginBottom:6}}>🧠</div>
-            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Gelire Göre Akıllı Ödeme Önerisi</div>
-            <div style={{fontSize:11,opacity:.8,lineHeight:1.7,marginBottom:12}}>Maaş ve ek gelirler hesaba katılarak kalan bütçe <strong>Avalanche yöntemiyle</strong> dağıtıldı.</div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {[["Toplam Gelir",fmt(totalIncome)],["Sabit Krediler",fmt(smart.fixedTotal)],["Yaşam Gideri",fmt(smart.living)],["Dağıtılabilir",fmt(smart.available)]].map(([l,v])=>(
-                <div key={l} style={{background:"rgba(255,255,255,.15)",borderRadius:10,padding:"7px 10px",flex:"1 1 calc(50% - 4px)"}}>
-                  <div style={{fontSize:9,opacity:.75}}>{l}</div><div style={{fontSize:13,fontWeight:800}}>{v}</div>
-                </div>
-              ))}
-            </div>
-          </Card>
-          {smart.payments.map((p,i)=>{
-            const pri=i===0;
-            return <Card key={p.id} style={{border:pri?"2px solid #c0392b":"1px solid #f0f0f0"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <div style={{width:24,height:24,borderRadius:"50%",background:pri?"#c0392b":"#ddd",color:pri?"#fff":"#888",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800}}>{i+1}</div>
-                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{p.name}</div><TBadge type={p.type}/><span style={{marginLeft:5,fontSize:10,color:"#888"}}>%{p.rate} · {fmt(p.remaining)}</span></div>
-                {pri&&<span style={{fontSize:9,background:"#fdf0f0",color:"#c0392b",borderRadius:20,padding:"2px 7px",fontWeight:700}}>ÖNCELİKLİ</span>}
-              </div>
-              <div style={{background:pri?"#fdf0f0":"#f8f9fa",borderRadius:12,padding:"12px 14px",marginBottom:10}}>
-                <div style={{fontSize:11,color:"#888",marginBottom:2}}>Önerilen aylık ödeme</div>
-                <div style={{fontSize:26,fontWeight:800,color:pri?"#c0392b":"#1a1a2e"}}>{fmt(p.suggested)}</div>
-                <div style={{fontSize:10,color:"#aaa"}}>Min: {fmt(p.minPay)} · +{fmt(p.suggested-p.minPay)} fazla</div>
-              </div>
-              <div style={{display:"flex",gap:6}}>
-                {[["Bitiş",`${p.finishMonths} ay`,"#2e7d32","#e8f5e9"],["Toplam Faiz",fmt(p.totalInterest),"#e65100","#fff8e1"],["Kazanç",fmt(p.savedVsMin),"#1565c0","#e3f2fd"]].map(([l,v,c,bg])=>(
-                  <div key={l} style={{flex:1,background:bg,borderRadius:10,padding:"8px",textAlign:"center"}}>
-                    <div style={{fontSize:9,color:"#555",marginBottom:2}}>{l}</div>
-                    <div style={{fontSize:12,fontWeight:700,color:c}}>{v}</div>
-                  </div>
-                ))}
-              </div>
-            </Card>;
-          })}
-          {smart.surplus>0&&<Card style={{background:"#f0fff4",border:"1px solid #b2dfdb"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#1b5e20",marginBottom:4}}>🎉 Aylık {fmt(smart.surplus)} artıyor</div>
-            <div style={{fontSize:12,color:"#388e3c",lineHeight:1.6}}>Tüm ödemeler sonrası kalan para. Acil fon veya ekstra ödeme için kullanabilirsin.</div>
-          </Card>}
-          <button onClick={applySmart} style={{...btnP,fontSize:15,padding:"15px",marginBottom:6}}>✅ Bu Tutarları Ödeme Planıma Uygula</button>
-          <div style={{fontSize:11,color:"#aaa",textAlign:"center",marginBottom:12}}>Borçlar sekmesinden istediğin zaman değiştirebilirsin</div>
-        </>}
-
-        {/* ══ ÖDEME PLANI ══════════════════════════════════════════════════ */}
-        {tab==="plan"&&<>
-          {suggApplied&&<Card style={{background:"#e8f5e9",border:"1px solid #c8e6c9",padding:"10px 14px",marginBottom:12}}>
-            <div style={{fontSize:12,color:"#2e7d32",fontWeight:600}}>✅ Akıllı öneri tutarları uygulandı!</div>
-          </Card>}
-          <Card style={{background:"linear-gradient(135deg,#1a1a2e,#2c3e50)",color:"#fff",padding:"14px 16px"}}>
-            <div style={{fontSize:15,fontWeight:800,marginBottom:4}}>📅 Aylık Ödeme Planım</div>
-            <div style={{fontSize:11,opacity:.75,lineHeight:1.7}}>Krediler <strong>sabit</strong>, kredi kartı &amp; KMH <strong>senin belirlediğin tutarla</strong>.</div>
-          </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>✏️ Esnek Ödeme Tutarlarım</div>
-            {debts.filter(d=>d.type!=="kredi").map(d=>{
-              const pl=buildFlexPlan(d);
-              const totInt=pl.reduce((s,r)=>s+r.interest,0);
-              return <div key={d.id} style={{background:"#f9f9f9",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <div><div style={{fontSize:12,fontWeight:700}}>{d.name}</div><div style={{fontSize:10,color:"#aaa"}}>{fmt(d.remaining)} · %{d.rate}</div></div>
-                  <TBadge type={d.type}/>
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <input type="number" value={d.userPayment||d.monthly} onChange={e=>updateUserPayment(d.id,e.target.value)} style={{...inp,marginBottom:0,flex:1,fontWeight:700,fontSize:14,textAlign:"right",background:"#fff"}}/>
-                  <span style={{fontSize:12,color:"#888"}}>₺/ay</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#888"}}>
-                  <span>📆 {pl.length} ay ({pl[pl.length-1]?.label})</span>
-                  <span style={{color:"#e67e22"}}>Faiz: {fmt(totInt)}</span>
-                </div>
-              </div>;
-            })}
-          </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>🏦 Sabit Taksitli Krediler</div>
-            {debts.filter(d=>d.type==="kredi").map(d=>(
-              <div key={d.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <div><div style={{fontSize:12,fontWeight:600}}>{d.name}</div><div style={{fontSize:10,color:"#aaa"}}>Her ay {d.payDay}. · {d.months} ay kaldı</div></div>
-                <div style={{textAlign:"right"}}><div style={{fontSize:13,fontWeight:800,color:"#2980b9"}}>{fmt(d.monthly)}</div><div style={{fontSize:10,color:"#aaa"}}>sabit</div></div>
-              </div>
-            ))}
-          </Card>
-          <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:8}}>🗓 Aylık Takvim</div>
-          {(showFullPlan?plan:plan.slice(0,6)).map(mg=>(
-            <Card key={mg.label} style={{padding:"13px 12px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-                <div><div style={{fontSize:14,fontWeight:800}}>{mg.label}</div><div style={{fontSize:10,color:"#aaa"}}>{mg.payments.length} ödeme</div></div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:15,fontWeight:800,color:"#c0392b"}}>{fmt(mg.total)}</div>
-                  <div style={{fontSize:10,color:totalIncome-mg.total>=0?"#27ae60":"#e74c3c",fontWeight:600}}>Kalan: {fmt(totalIncome-mg.total)}</div>
-                </div>
-              </div>
-              {mg.payments.map((p,pi)=>{
-                const icon=p.debtType==="kredi"?"🏦":p.debtType==="kmh"?"💜":"💳";
-                const bg=p.debtType==="kredi"?"#e3f2fd":p.debtType==="kmh"?"#f3e8fd":"#fff8f0";
-                return <div key={pi} className="hover-row" style={{display:"flex",alignItems:"flex-start",padding:"7px 6px",borderRadius:8,marginBottom:2,background:bg,gap:8}}>
-                  <div style={{fontSize:17,marginTop:1}}>{icon}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600}}>{p.debtName}</div>
-                    <div style={{fontSize:10,color:"#888"}}>📌 {p.date}</div>
-                    {p.debtType!=="kredi"&&p.interest!=null&&<div style={{fontSize:10,color:"#aaa",marginTop:1}}>
-                      Faiz: <span style={{color:"#e67e22",fontWeight:600}}>{fmt(p.interest)}</span> · Ana: <span style={{color:"#27ae60",fontWeight:600}}>{fmt(p.principal)}</span> · Kalan: {fmt(p.remaining)}
-                    </div>}
-                  </div>
-                  <div style={{fontSize:14,fontWeight:800,flexShrink:0}}>{fmt(p.payment)}</div>
-                </div>;
-              })}
-              <div style={{marginTop:8,paddingTop:8,borderTop:"2px solid #f0f0f0",display:"flex",justifyContent:"space-between",fontSize:11}}>
-                <span style={{color:"#888"}}>Toplam ödeme</span><span style={{fontWeight:800,color:"#c0392b"}}>{fmt(mg.total)}</span>
-              </div>
-            </Card>
-          ))}
-          <button onClick={()=>setShowFullPlan(v=>!v)} style={{...btnS("#2c3e50"),marginBottom:12}}>
-            {showFullPlan?`▲ Daha Az Göster`:`▼ Tüm Planı Göster (${plan.length} ay)`}
-          </button>
-          <Card style={{background:"#f8fff8",border:"1px solid #c8e6c9"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#2e7d32",marginBottom:10}}>📊 Toplam Özet</div>
-            {debts.map(d=>{
-              const pl=d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d);
-              const totPaid=pl.reduce((s,r)=>s+r.payment,0);
-              const totInt=pl.reduce((s,r)=>s+(r.interest||0),0);
-              return <div key={d.id} style={{padding:"8px 0",borderBottom:"1px solid #e8f5e9"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                  <span style={{fontSize:12,fontWeight:600}}>{d.name}</span><span style={{fontSize:12,color:"#c0392b",fontWeight:700}}>{pl.length} ay</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#666"}}>
-                  <span>Toplam: {fmt(totPaid)}</span>{totInt>0&&<span style={{color:"#e67e22"}}>Faiz: {fmt(totInt)}</span>}
-                </div>
-              </div>;
-            })}
-            <div style={{marginTop:10,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
-              <span>Tüm borçlardan kurtulma</span><span style={{color:"#c0392b"}}>{longestMonths} ay</span>
-            </div>
-          </Card>
-          <button onClick={exportExcel} style={btnS("#27ae60")}>📊 Ödeme Planını Excel'e Aktar</button>
-        </>}
-
-        {/* ══ AYLIK RAPOR ══════════════════════════════════════════════════ */}
-        {tab==="rapor"&&<>
-          <Card style={{background:"linear-gradient(135deg,#1a237e,#283593)",color:"#fff",padding:"18px 16px"}}>
-            <div style={{fontSize:22,marginBottom:6}}>📋</div>
-            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Aylık Finansal Rapor</div>
-            <div style={{fontSize:11,opacity:.8,lineHeight:1.7,marginBottom:14}}>
-              Bir önceki aya ait tüm gelir, gider ve borç verilerini analiz ederek kişisel rapor oluşturur.
-            </div>
-            <button onClick={getMonthlyReport} disabled={reportLoading} style={{...btnP,background:"#3949ab",opacity:reportLoading?.7:1,fontSize:14,padding:"13px"}}>
-              {reportLoading?"⏳ Rapor hazırlanıyor...":"📊 Aylık Raporu Oluştur"}
-            </button>
-          </Card>
-
-          {/* Hızlı Özet Kartları */}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-            {[
-              ["💰 Toplam Gelir",fmt(totalIncome),"#27ae60","#f0fff4"],
-              ["💸 Borç Ödemeleri",fmt(totalMonthly),"#e67e22","#fff8f0"],
-              ["🧾 Toplam Gider",fmt(totalExpenses),"#e74c3c","#fff5f5"],
-              ["✅ Net Kalan",fmt(freeIncome),freeIncome>=0?"#27ae60":"#e74c3c",freeIncome>=0?"#f0fff4":"#fff5f5"],
-            ].map(([l,v,c,bg])=>(
-              <div key={l} style={{background:bg,borderRadius:14,padding:"12px 13px",border:`1px solid ${c}22`}}>
-                <div style={{fontSize:10,color:"#888",marginBottom:4}}>{l}</div>
-                <div style={{fontSize:15,fontWeight:800,color:c}}>{v}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Sabit Giderler Özeti */}
-          {activeRecurring.length>0&&<Card style={{background:"#f9f0ff",border:"1px solid #d7bef5"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#8e44ad",marginBottom:10}}>🔄 Sabit Giderler Özeti</div>
-            {activeRecurring.map(r=>{
-              const start=new Date(r.startDate);
-              const startMonth=start.getFullYear()*12+start.getMonth();
-              const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
-              const elapsed=nowMonth-startMonth+1;
-              const remaining=r.totalMonths-elapsed+1;
-              return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #e8d5f5"}}>
-                <div>
-                  <div style={{fontSize:12,fontWeight:600}}>{r.icon} {r.category}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>{elapsed}/{r.totalMonths} ay ödendi · {remaining} ay kaldı</div>
-                  <div style={{background:"#e8d5f5",borderRadius:99,height:4,width:120,marginTop:3,overflow:"hidden"}}>
-                    <div style={{width:`${(elapsed/r.totalMonths)*100}%`,height:"100%",background:"#8e44ad",borderRadius:99}}/>
-                  </div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(r.amount)}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>Kalan: {fmt(r.amount*remaining)}</div>
-                </div>
-              </div>;
-            })}
-            <div style={{marginTop:8,display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700,color:"#8e44ad"}}>
-              <span>Aylık toplam sabit gider</span>
-              <span>{fmt(activeRecurring.reduce((s,r)=>s+r.amount,0))}</span>
-            </div>
-          </Card>}
-
-          {/* Kategori Dağılımı */}
-          {catData.length>0&&<Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>📊 Bu Ay Gider Dağılımı</div>
-            <BarChartH data={catData.map(c=>({label:c.name,value:c.tutar}))} color="#3949ab"/>
-            <div style={{marginTop:10,borderTop:"1px solid #f5f5f5",paddingTop:8,display:"flex",justifyContent:"space-between",fontSize:12,fontWeight:700}}>
-              <span style={{color:"#555"}}>Toplam</span>
-              <span style={{color:"#1a237e"}}>{fmt(totalExpenses)}</span>
-            </div>
-          </Card>}
-
-          {/* AI Rapor Sonucu */}
-          {reportLoading&&<Card><div className="pulse" style={{textAlign:"center",padding:"24px",color:"#888",fontSize:13}}>
-            <div style={{fontSize:32,marginBottom:8}}>📊</div>
-            Veriler analiz ediliyor, rapor hazırlanıyor...
-          </div></Card>}
-
-          {monthlyReport&&<Card style={{border:"2px solid #c5cae9"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#1a237e"}}>📋 Aylık Rapor</div>
-              <span style={{fontSize:10,background:"#e8eaf6",color:"#3949ab",borderRadius:20,padding:"3px 10px",fontWeight:600}}>
-                {MONTHS[new Date().getMonth()-1<0?11:new Date().getMonth()-1]} {new Date().getMonth()===0?new Date().getFullYear()-1:new Date().getFullYear()}
-              </span>
-            </div>
-            <div style={{fontSize:13,lineHeight:1.9,color:"#333",whiteSpace:"pre-wrap"}}>{monthlyReport}</div>
-            <button onClick={()=>{
-              const el=document.createElement('a');
-              el.href='data:text/plain;charset=utf-8,'+encodeURIComponent(monthlyReport);
-              el.download=`Finans_Rapor_${curMonth}.txt`;el.click();
-            }} style={{...btnS("#3949ab"),marginTop:12,fontSize:12,padding:"10px"}}>💾 Raporu İndir</button>
-          </Card>}
-
-          {!monthlyReport&&!reportLoading&&<Card style={{background:"#f8f9ff",border:"1px solid #c5cae9"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#3949ab",marginBottom:8}}>💡 Rapor Neler İçerir?</div>
-            {["Geçen aya ait gelir-gider analizi","En yüksek harcama kalemleri ve yorum","Borç ödeme durumu değerlendirmesi","Dikkat edilmesi gereken noktalar","Gelecek ay için somut öneriler"].map((t,i)=>(
-              <div key={i} style={{fontSize:12,color:"#555",padding:"5px 0",display:"flex",gap:8,borderBottom:"1px solid #e8eaf6"}}>
-                <span style={{color:"#3949ab"}}>✓</span><span>{t}</span>
-              </div>
-            ))}
-          </Card>}
-        </>}
-
-        {/* ══ AI ═══════════════════════════════════════════════════════════ */}
-        {tab==="ai"&&<>
-          {/* Sohbet başlık */}
-          <Card style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",color:"#fff",padding:"14px 16px",marginBottom:8}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🤖</div>
-                <div>
-                  <div style={{fontSize:14,fontWeight:800}}>Finans Asistanın</div>
-                  <div style={{fontSize:10,opacity:.65,display:"flex",alignItems:"center",gap:4}}>
-                    <div style={{width:6,height:6,borderRadius:"50%",background:"#2ecc71"}}/>
-                    Finansal verilerini biliyor · Her an sohbet et
-                  </div>
-                </div>
-              </div>
-              {chatMessages.length>0&&<button onClick={()=>setChatMessages([])} style={{background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>🗑 Temizle</button>}
-            </div>
-          </Card>
-
-          {/* Hızlı soru önerileri */}
-          {chatMessages.length===0&&<div style={{marginBottom:10}}>
-            <div style={{fontSize:11,color:"#888",marginBottom:8,paddingLeft:2}}>💡 Hızlı sorular:</div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {[
-                "Hangi borcumu önce kapatmalıyım?",
-                "Bu ay ne kadar tasarruf edebilirim?",
-                "Kredi kartı borcumu ne zaman bitirebilirim?",
-                "Finansal durumumu değerlendirir misin?",
-                "Aylık bütçe nasıl ayarlamalıyım?",
-                "Acil fon oluşturmak için önerir misin?",
-              ].map((q,i)=>(
-                <button key={i} onClick={()=>{setChatInput(q);setTimeout(()=>chatInputRef.current?.focus(),50);}} style={{background:"#fff",border:"1.5px solid #e0e0e0",borderRadius:20,padding:"6px 12px",fontSize:11,color:"#444",cursor:"pointer",fontFamily:"'Sora',sans-serif",transition:"all .15s"}}
-                  onMouseOver={e=>e.target.style.borderColor="#c0392b"}
-                  onMouseOut={e=>e.target.style.borderColor="#e0e0e0"}>
-                  {q}
-                </button>
-              ))}
-            </div>
-          </div>}
-
-          {/* Mesaj alanı */}
-          <div style={{background:"#fff",borderRadius:16,boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:10,overflow:"hidden"}}>
-            <div style={{maxHeight:420,overflowY:"auto",padding:"14px 13px",display:"flex",flexDirection:"column",gap:10,minHeight:chatMessages.length===0?120:0}}>
-              {chatMessages.length===0&&<div style={{textAlign:"center",padding:"20px 0",color:"#ccc"}}>
-                <div style={{fontSize:32,marginBottom:8}}>💬</div>
-                <div style={{fontSize:13}}>Finansal durumun hakkında sormak istediğin bir şey var mı?</div>
-              </div>}
-
-              {chatMessages.map((m,i)=>{
-                const isUser=m.role==="user";
-                return <div key={i} style={{display:"flex",flexDirection:isUser?"row-reverse":"row",gap:8,alignItems:"flex-end"}}>
-                  {!isUser&&<div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>🤖</div>}
-                  <div style={{maxWidth:"80%"}}>
-                    <div style={{
-                      padding:"10px 13px",
-                      borderRadius:isUser?"16px 16px 4px 16px":"16px 16px 16px 4px",
-                      background:isUser?"linear-gradient(135deg,#c0392b,#922b21)":"#f5f5f5",
-                      color:isUser?"#fff":"#333",
-                      fontSize:13,
-                      lineHeight:1.6,
-                      whiteSpace:"pre-wrap",
-                      wordBreak:"break-word",
-                    }}>{m.content}</div>
-                    {m.time&&<div style={{fontSize:9,color:"#bbb",marginTop:3,textAlign:isUser?"right":"left",paddingLeft:isUser?0:4}}>{m.time}</div>}
-                  </div>
-                </div>;
-              })}
-
-              {chatLoading&&<div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
-                <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
-                <div style={{padding:"10px 14px",background:"#f5f5f5",borderRadius:"16px 16px 16px 4px"}}>
-                  <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                    {[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:"#bbb",animation:`pu 1.2s ${i*0.2}s infinite`}}/>)}
-                  </div>
-                </div>
-              </div>}
-              <div ref={chatEndRef}/>
-            </div>
-
-            {/* Giriş alanı */}
-            <div style={{borderTop:"1px solid #f0f0f0",padding:"10px 12px",display:"flex",gap:8,alignItems:"flex-end"}}>
-              <textarea
-                ref={chatInputRef}
-                value={chatInput}
-                onChange={e=>setChatInput(e.target.value)}
-                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();}}}
-                placeholder="Sor... (Enter ile gönder, Shift+Enter yeni satır)"
-                rows={1}
-                style={{flex:1,border:"1.5px solid #e8ecf0",borderRadius:12,padding:"10px 12px",fontSize:13,fontFamily:"'Sora',sans-serif",outline:"none",resize:"none",lineHeight:1.5,maxHeight:100,overflowY:"auto",boxSizing:"border-box"}}
-                onInput={e=>{e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,100)+"px";}}
-              />
-              <button onClick={sendChat} disabled={chatLoading||!chatInput.trim()} style={{width:42,height:42,borderRadius:"50%",background:chatInput.trim()?"linear-gradient(135deg,#c0392b,#922b21)":"#eee",border:"none",color:chatInput.trim()?"#fff":"#bbb",fontSize:18,cursor:chatInput.trim()?"pointer":"default",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .2s"}}>
-                ➤
-              </button>
-            </div>
-          </div>
-
-          {/* Finansal özet chip'leri */}
-          <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:12}}>
-            {[
-              [`💰 ${fmt(totalIncome)}`,"Gelir"],
-              [`💸 ${fmt(totalMonthly)}`,"Borç öd."],
-              [`📊 %${debtRatio}`,"Borç/Gelir"],
-              [`✅ ${fmt(freeIncome)}`,"Net kalan"],
-            ].map(([v,l])=>(
-              <div key={l} style={{background:"#fff",borderRadius:20,padding:"5px 12px",fontSize:11,boxShadow:"0 1px 6px rgba(0,0,0,.06)",display:"flex",gap:5,alignItems:"center"}}>
-                <span style={{fontWeight:700,color:"#1a1a2e"}}>{v}</span>
-                <span style={{color:"#aaa"}}>{l}</span>
-              </div>
-            ))}
-          </div>
-        </>}
-
+      <div class="rega" id="regAmt"><span>₺</span>0</div>
+    </div>
+    <div class="sh">
+      <div class="st">🎁 Özel Günler &amp; Bonuslar</div>
+      <button class="badd" onclick="openM('bon')">+</button>
+    </div>
+    <div id="bonList"><div class="emp"><div class="ei">🎀</div><div class="et">Doğum günü, bayram,<br/>karne bonusu ekle!</div></div></div>
+  </div>
+
+  <!-- GOALS -->
+  <div id="pg-gls" class="pg">
+    <div class="sh">
+      <div class="st">🎯 Hedeflerim</div>
+      <button class="badd" onclick="openM('goal')">+</button>
+    </div>
+    <div id="goalList"><div class="emp"><div class="ei">🌟</div><div class="et">Biriktirerek almak istediğin<br/>ürünü ekle!</div></div></div>
+  </div>
+
+  <!-- EXPENSES -->
+  <div id="pg-exp" class="pg">
+    <div class="sh">
+      <div class="st">🛍️ Harcamalarım</div>
+      <button class="badd" onclick="openM('expm')">+</button>
+    </div>
+    <div id="expList"><div class="emp"><div class="ei">🧾</div><div class="et">Henüz harcama yok.</div></div></div>
+  </div>
+
+  <!-- BADGES -->
+  <div id="pg-bdg" class="pg">
+    <div class="sh"><div class="st">🏆 Rozetlerim</div></div>
+    <div class="bgrid" id="bgrid"></div>
+  </div>
+
+</div>
+
+<!-- Bottom Nav -->
+<div class="bnav">
+  <button class="nb active" onclick="goTab('inc')" id="nav-inc"><span class="ni">💰</span>Gelirler</button>
+  <button class="nb" onclick="goTab('gls')" id="nav-gls"><span class="ni">🎯</span>Hedefler</button>
+  <button class="nb" onclick="goTab('exp')" id="nav-exp"><span class="ni">🛍️</span>Harcama</button>
+  <button class="nb" onclick="goTab('bdg')" id="nav-bdg"><span class="ni">🏆</span>Rozetler</button>
+</div>
+
+<div class="tw" id="tw"></div>
+
+<!-- ══ MODALS ══ -->
+
+<!-- Regular Income -->
+<div class="mo" id="m-ri">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">💵 Haftalık Harçlık</div>
+    <div class="fg"><label class="fl">Haftalık Tutar (₺)</label><input class="fi" type="number" id="ri-a" placeholder="100"/></div>
+    <div class="fg"><label class="fl">Başlangıç Tarihi</label><input class="fi" type="date" id="ri-d"/></div>
+    <button class="bsub" onclick="saveRI()">💾 Kaydet</button>
+  </div>
+</div>
+
+<!-- Bonus -->
+<div class="mo" id="m-bon">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">🎁 Bonus Ekle</div>
+    <div class="fg">
+      <label class="fl">Kategori</label>
+      <div class="ep" id="ep-bon">
+        <div class="eo sel" data-e="🎂" onclick="selE(this,'bon')">🎂</div>
+        <div class="eo" data-e="🎓" onclick="selE(this,'bon')">🎓</div>
+        <div class="eo" data-e="🌙" onclick="selE(this,'bon')">🌙</div>
+        <div class="eo" data-e="🎊" onclick="selE(this,'bon')">🎊</div>
+        <div class="eo" data-e="💝" onclick="selE(this,'bon')">💝</div>
+        <div class="eo" data-e="🏅" onclick="selE(this,'bon')">🏅</div>
+        <div class="eo" data-e="⭐" onclick="selE(this,'bon')">⭐</div>
+        <div class="eo" data-e="🎁" onclick="selE(this,'bon')">🎁</div>
       </div>
     </div>
-  </>;
+    <div class="fg"><label class="fl">Açıklama</label><input class="fi" type="text" id="bon-n" placeholder="Doğum günü hediyesi"/></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Tutar (₺)</label><input class="fi" type="number" id="bon-a" placeholder="500"/></div>
+      <div class="fg"><label class="fl">Tarih</label><input class="fi" type="date" id="bon-d"/></div>
+    </div>
+    <button class="bsub" onclick="addBonus()">🎁 Ekle</button>
+  </div>
+</div>
+
+<!-- Add Goal -->
+<div class="mo" id="m-goal">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">🎯 Hedef Ekle</div>
+    <div class="fg"><label class="fl">Ürün Adı</label><input class="fi" type="text" id="gl-n" placeholder="Nintendo Switch"/></div>
+    <div class="fg"><label class="fl">Fiyat (₺)</label><input class="fi" type="number" id="gl-p" placeholder="8999"/></div>
+    <div class="fg"><label class="fl">Akakçe / Cimri Linki (opsiyonel)</label><input class="fi" type="url" id="gl-u" placeholder="https://akakce.com/..."/></div>
+    <div class="fg">
+      <label class="fl">Emoji</label>
+      <div class="ep" id="ep-gl">
+        <div class="eo sel" data-e="🎮" onclick="selE(this,'gl')">🎮</div>
+        <div class="eo" data-e="📱" onclick="selE(this,'gl')">📱</div>
+        <div class="eo" data-e="💻" onclick="selE(this,'gl')">💻</div>
+        <div class="eo" data-e="🎧" onclick="selE(this,'gl')">🎧</div>
+        <div class="eo" data-e="🚲" onclick="selE(this,'gl')">🚲</div>
+        <div class="eo" data-e="📷" onclick="selE(this,'gl')">📷</div>
+        <div class="eo" data-e="⌚" onclick="selE(this,'gl')">⌚</div>
+        <div class="eo" data-e="🌟" onclick="selE(this,'gl')">🌟</div>
+      </div>
+    </div>
+    <button class="bsub" onclick="addGoal()">🎯 Hedef Ekle</button>
+  </div>
+</div>
+
+<!-- Edit Goal -->
+<div class="mo" id="m-egl">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">✏️ Hedefi Düzenle</div>
+    <input type="hidden" id="eg-i"/>
+    <div class="fg"><label class="fl">Ürün Adı</label><input class="fi" type="text" id="eg-n"/></div>
+    <div class="fg"><label class="fl">Fiyat (₺)</label><input class="fi" type="number" id="eg-p"/></div>
+    <div class="fg"><label class="fl">Akakçe / Cimri Linki</label><input class="fi" type="url" id="eg-u" placeholder="https://akakce.com/..."/></div>
+    <div class="fg">
+      <label class="fl">Emoji</label>
+      <div class="ep" id="ep-egl">
+        <div class="eo" data-e="🎮" onclick="selE(this,'egl')">🎮</div>
+        <div class="eo" data-e="📱" onclick="selE(this,'egl')">📱</div>
+        <div class="eo" data-e="💻" onclick="selE(this,'egl')">💻</div>
+        <div class="eo" data-e="🎧" onclick="selE(this,'egl')">🎧</div>
+        <div class="eo" data-e="🚲" onclick="selE(this,'egl')">🚲</div>
+        <div class="eo" data-e="📷" onclick="selE(this,'egl')">📷</div>
+        <div class="eo" data-e="⌚" onclick="selE(this,'egl')">⌚</div>
+        <div class="eo" data-e="🌟" onclick="selE(this,'egl')">🌟</div>
+      </div>
+    </div>
+    <div class="brow">
+      <button class="bdng" onclick="delGoalEdit()">🗑️ Sil</button>
+      <button class="bsav" onclick="saveEditGoal()">💾 Kaydet</button>
+    </div>
+  </div>
+</div>
+
+<!-- Expense -->
+<div class="mo" id="m-expm">
+  <div class="ms">
+    <div class="mh"></div>
+    <div class="mt">🛍️ Harcama Ekle</div>
+    <div class="fg"><label class="fl">Ne Aldın?</label><input class="fi" type="text" id="ex-n" placeholder="Dondurma"/></div>
+    <div class="fr">
+      <div class="fg"><label class="fl">Tutar (₺)</label><input class="fi" type="number" id="ex-a" placeholder="25"/></div>
+      <div class="fg"><label class="fl">Tarih</label><input class="fi" type="date" id="ex-d"/></div>
+    </div>
+    <div class="fg">
+      <label class="fl">Kategori</label>
+      <div class="ep" id="ep-ex">
+        <div class="eo sel" data-e="🍦" onclick="selE(this,'ex')">🍦</div>
+        <div class="eo" data-e="🎮" onclick="selE(this,'ex')">🎮</div>
+        <div class="eo" data-e="📚" onclick="selE(this,'ex')">📚</div>
+        <div class="eo" data-e="👟" onclick="selE(this,'ex')">👟</div>
+        <div class="eo" data-e="🍕" onclick="selE(this,'ex')">🍕</div>
+        <div class="eo" data-e="🎨" onclick="selE(this,'ex')">🎨</div>
+        <div class="eo" data-e="🚌" onclick="selE(this,'ex')">🚌</div>
+        <div class="eo" data-e="💄" onclick="selE(this,'ex')">💄</div>
+      </div>
+    </div>
+    <button class="bsub" onclick="addExp()">💸 Ekle</button>
+  </div>
+</div>
+
+<script>
+/* ── STATE ── */
+let S = { ri:{amount:0,startDate:null}, bonuses:[], goals:[], expenses:[] };
+const CI = {};
+
+/* ── CALC ── */
+const bonSum  = () => S.bonuses.reduce((a,b)=>a + Number(b.amount), 0);
+const expSum  = () => S.expenses.reduce((a,e)=>a + Number(e.amount), 0);
+function alwSum() {
+  if (!S.ri.amount || !S.ri.startDate) return 0;
+  const s = new Date(S.ri.startDate), n = new Date();
+  if (s > n) return 0;
+  // Cap: don't count future weeks
+  const msElapsed = n - s;
+  const weeks = Math.floor(msElapsed / (7*864e5)) + 1;
+  // Safety cap: max 520 weeks (10 years)
+  return Math.min(weeks, 520) * Number(S.ri.amount);
+}
+const incSum  = () => bonSum() + alwSum();
+const bal     = () => Math.max(0, incSum() - expSum());
+function wksTo(price) {
+  const numPrice = Number(price);
+  const r = numPrice - bal();
+  if (r <= 0) return 0;
+  if (!S.ri.amount) return null;
+  return Math.ceil(r / Number(S.ri.amount));
+}
+function tgtDate(price) {
+  const w = wksTo(price);
+  if (!w) return null;
+  const d = new Date(); d.setDate(d.getDate() + w*7);
+  return d.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'});
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+/* ── PARENT MODE ── */
+const IS_PARENT = new URLSearchParams(location.search).has('parent');
+
+/* ── FİREBASE ── */
+const FB_CONFIG = {
+  apiKey:            "AIzaSyDNZcMFiwFLYeNFBPDstt6weBwAJesO_lQ",
+  authDomain:        "kumbara-343ca.firebaseapp.com",
+  databaseURL:       "https://kumbara-343ca-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:         "kumbara-343ca",
+  storageBucket:     "kumbara-343ca.firebasestorage.app",
+  messagingSenderId: "912649995360",
+  appId:             "1:912649995360:web:baa00365550e60bb11af05"
+};
+let fbDB = null;
+function initFirebase() {
+  try {
+    firebase.initializeApp(FB_CONFIG);
+    fbDB = firebase.database();
+    console.log('✅ Firebase bağlandı');
+  } catch(e) {
+    console.error('❌ Firebase hatası:', e);
+  }
+}
+
+/* ── STORAGE ── */
+async function save() {
+  const d = JSON.stringify(S);
+  try { localStorage.setItem('kumbara-v3', d); } catch(_) {}
+  if (fbDB) {
+    try { await fbDB.ref('kumbara/data').set({ json: d, ts: Date.now() }); }
+    catch(e) { console.warn('Firebase yazma hatası:', e); }
+  }
+}
+async function load() {
+  let d = null;
+  if (fbDB) {
+    try {
+      const snap = await fbDB.ref('kumbara/data').once('value');
+      if (snap.exists()) d = snap.val().json;
+    } catch(e) { console.warn('Firebase okuma hatası:', e); }
+  }
+  if (!d) { try { d = localStorage.getItem('kumbara-v3'); } catch(_) {} }
+  if (!d) { try { d = localStorage.getItem('kumbara-v2'); } catch(_) {} }
+  if (d) { try { S = JSON.parse(d); } catch(_) {} }
+}
+function listenFirebase() {
+  if (!fbDB || !IS_PARENT) return;
+  fbDB.ref('kumbara/data').on('value', snap => {
+    if (!snap.exists()) return;
+    try {
+      const parsed = JSON.parse(snap.val().json);
+      if (!parsed.ri || !parsed.bonuses) return;
+      S = parsed;
+      S.ri.amount = Number(S.ri.amount) || 0;
+      S.bonuses  = S.bonuses.map(b=>({...b, amount:Number(b.amount)||0}));
+      S.expenses = S.expenses.map(e=>({...e, amount:Number(e.amount)||0}));
+      S.goals    = S.goals.map(g=>({...g, price:Number(g.price)||0}));
+      renderAll();
+      const el = document.getElementById('pbLastUpdate');
+      if (el) el.textContent = `Son güncelleme: ${new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}`;
+    } catch(_) {}
+  });
+}
+
+/* ── RENDER ALL ── */
+function renderAll() {
+  renderBal(); renderStrip(); renderRI(); renderBonuses();
+  renderGoals(); renderExp(); renderBadges(); renderNotifPrompt();
+}
+
+function renderBal() {
+  document.getElementById('balAmt').innerHTML = `<sup>₺</sup>${fmt(bal())}`;
+  document.getElementById('sInc').textContent  = `+₺${fmt(incSum())}`;
+  document.getElementById('sExp').textContent  = `-₺${fmt(expSum())}`;
+  document.getElementById('sWkly').textContent = `₺${fmt(S.ri.amount)}`;
+}
+
+/* ── GOAL STRIP ── */
+function renderStrip() {
+  const el = document.getElementById('gstrip');
+  if (!S.goals.length) { el.innerHTML=''; return; }
+  const b = bal();
+  el.innerHTML = S.goals.map((g,i) => {
+    const gp   = Number(g.price);
+    const w    = wksTo(gp);
+    const done = b >= gp;
+    const pct  = Math.min(100,(b/gp)*100);
+    return `<div class="gchip${done?' done':''}" onclick="goTab('gls')">
+      <div class="gce">${g.emoji}</div>
+      <div class="gci">
+        <div class="gcn">${g.name}</div>
+        <div class="gcw">${done?'✓':w!==null?w:'—'}</div>
+        <div class="gcu">${done?'Hazır!':w!==null?'hafta kaldı':'harçlık girilmemiş'}</div>
+        <div class="gcb"><div class="gcbf" style="width:${pct}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderRI() {
+  document.getElementById('regAmt').innerHTML = `<span>₺</span>${fmt(S.ri.amount)}`;
+  if (S.ri.startDate) {
+    const nx = new Date(S.ri.startDate), now = new Date();
+    while (nx <= now) nx.setDate(nx.getDate()+7);
+    document.getElementById('nextDt').textContent =
+      `Sonraki: ${nx.toLocaleDateString('tr-TR',{day:'2-digit',month:'long'})}`;
+  }
+}
+
+function renderBonuses() {
+  const el = document.getElementById('bonList');
+  if (!S.bonuses.length) {
+    el.innerHTML='<div class="emp"><div class="ei">🎀</div><div class="et">Doğum günü, bayram,<br/>karne bonusu ekle!</div></div>';
+    return;
+  }
+  const bg=['#FDE9A2','#FFCACA','#B8EDD8','#C0E8FF','#F5C8DF'];
+  el.innerHTML = S.bonuses.slice().reverse().map((b,ri) => {
+    const i = S.bonuses.length-1-ri;
+    return `<div class="bitem">
+      <div class="bico" style="background:${bg[i%5]}">${b.emoji}</div>
+      <div class="bin"><div class="bname">${b.name}</div><div class="bdate">${fmtD(b.date)}</div></div>
+      <div class="bamt">+₺${fmt(b.amount)}</div>
+      <button class="bdel" onclick="delBonus(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function renderGoals() {
+  const el = document.getElementById('goalList');
+  if (!S.goals.length) {
+    el.innerHTML='<div class="emp"><div class="ei">🌟</div><div class="et">Biriktirerek almak istediğin<br/>ürünü ekle!</div></div>';
+    return;
+  }
+  const b = bal();
+  el.innerHTML = S.goals.map((g,i) => {
+    const gPrice = Number(g.price);
+    const pct  = Math.min(100,(b/gPrice)*100);
+    const w    = wksTo(gPrice);
+    const done = b >= gPrice;
+    const td   = tgtDate(gPrice);
+    const hasH = g.priceHistory && g.priceHistory.length > 0;
+    const alts = priceAlerts(g);
+    return `<div class="gc">
+      <div class="gtop">
+        <div style="display:flex;align-items:center;gap:9px;flex:1;min-width:0">
+          <div class="gen">${g.emoji}</div>
+          <div style="min-width:0">
+            <div class="gnm">${g.name}</div>
+            <div class="gpt">Hedef: <strong>₺${fmt(gPrice)}</strong></div>
+          </div>
+        </div>
+        <button class="bedit" onclick="openEditGoal(${i})" style="flex-shrink:0">✏️</button>
+      </div>
+
+      <div class="gcd${done?' done':''}">
+        <div class="cdl">
+          <div class="cdt">${done?'🎉 Tebrikler!':'⏳ Hedefe Kalan'}</div>
+          <div class="cds">${done?'Satın alabilirsin!':w!==null?`Birikim: ₺${fmt(b)}`:'Haftalık harçlık girilmemiş'}</div>
+          ${td?`<div class="cdd">📅 Tahmini: ${td}</div>`:''}
+        </div>
+        <div class="cdr">
+          ${done
+            ? `<div class="cdn">✓</div><div class="cdu">Hazır!</div>`
+            : w!==null
+              ? `<div class="cdn">${w}</div><div class="cdu">HAFTA</div>`
+              : `<div class="cdn" style="font-size:26px">—</div>`
+          }
+        </div>
+      </div>
+
+      <div class="gprog">
+        <div class="pbw"><div class="pbf" style="width:${pct}%"></div></div>
+        <div class="plbl">
+          <span>Birikim: <strong>₺${fmt(b)}</strong></span>
+          <span><strong>${pct.toFixed(0)}%</strong> tamamlandı</span>
+        </div>
+      </div>
+
+      <div class="gcha">
+        <div class="chh">
+          <div class="cht">📈 Fiyat Geçmişi</div>
+          ${g.url?`<button class="chref" onclick="fetchPrice(${i})">🔄 Güncelle</button>`:''}
+        </div>
+        ${hasH
+          ? `<div class="chc"><canvas id="ch-${i}"></canvas></div>`
+          : g.url
+            ? `<div class="chl" id="chl-${i}"><span>Fiyat verisi bekleniyor</span><button class="chref" onclick="fetchPrice(${i})">📊 Fiyat Çek</button></div>`
+            : `<div class="chl">Fiyat takibi için link girin</div>`
+        }
+      </div>
+
+      ${alts.length?`<div class="ptags">${alts.map(a=>`<div class="ptag ${a.t}">${a.i} ${a.m}</div>`).join('')}</div>`:''}
+
+      <div class="gft">
+        ${g.url?`<button class="gfurl" onclick="window.open('${g.url}','_blank')">🔗 Ürüne Git</button>`:'<span></span>'}
+        <span style="font-size:10px;color:var(--tm)">${fmtD(g.addedAt)}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  S.goals.forEach((g,i) => {
+    if (g.priceHistory && g.priceHistory.length > 0) drawChart(i, g);
+  });
+}
+
+function priceAlerts(g) {
+  const h = g.priceHistory;
+  if (!h || h.length < 2) return [];
+  const ps = h.map(p=>p.price);
+  const cur=ps[ps.length-1], prev=ps[ps.length-2];
+  const min30=Math.min(...ps), max30=Math.max(...ps);
+  const a=[];
+  if (cur===min30) a.push({t:'low',i:'📉',m:`Son 30 günün en düşük fiyatı! ₺${fmt(cur)}`});
+  if (cur > prev) { const r=((cur-prev)/prev*100).toFixed(0); a.push({t:'high',i:'⬆️',m:`%${r} arttı → ₺${fmt(cur)}`}); }
+  else if (cur < prev) { const d=((prev-cur)/prev*100).toFixed(0); a.push({t:'low',i:'⬇️',m:`%${d} düştü → ₺${fmt(cur)}`}); }
+  if (cur < g.price) a.push({t:'info',i:'💡',m:`₺${fmt(g.price-cur)} daha biriktirmek gerekiyor`});
+  return a;
+}
+
+function drawChart(i, g) {
+  const canvas = document.getElementById('ch-'+i);
+  if (!canvas) return;
+  if (CI[i]) { CI[i].destroy(); }
+  const prices = g.priceHistory.map(p=>p.price);
+  const labels = g.priceHistory.map(p=>p.date);
+  const mn=Math.min(...prices), mx=Math.max(...prices);
+  CI[i] = new Chart(canvas, {
+    type:'line',
+    data:{ labels, datasets:[{
+      label:'₺', data:prices,
+      borderColor:'#9B72CF', backgroundColor:'rgba(155,114,207,.08)',
+      borderWidth:2.5, tension:0.4, fill:true,
+      pointRadius:prices.map(p=>p===mn||p===mx?6:3),
+      pointBackgroundColor:prices.map(p=>p===mn?'#72C9A8':p===mx?'#E88C8C':'#9B72CF'),
+      pointBorderColor:'#fff', pointBorderWidth:2,
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`₺${fmt(ctx.parsed.y)}`}} },
+      scales:{
+        x:{ ticks:{font:{size:9,family:'Nunito'},color:'#A898C0',maxRotation:0,maxTicksLimit:6}, grid:{display:false}, border:{display:false} },
+        y:{ ticks:{font:{size:9,family:'Nunito'},color:'#A898C0',callback:v=>'₺'+fmt(v)}, grid:{color:'rgba(155,114,207,.07)'}, border:{display:false} }
+      }
+    }
+  });
+}
+
+function renderExp() {
+  const el = document.getElementById('expList');
+  if (!S.expenses.length) {
+    el.innerHTML='<div class="emp"><div class="ei">🧾</div><div class="et">Henüz harcama yok.</div></div>';
+    return;
+  }
+  el.innerHTML = S.expenses.slice().reverse().map((e,ri) => {
+    const i = S.expenses.length-1-ri;
+    return `<div class="eitem">
+      <div class="eico">${e.emoji}</div>
+      <div class="ein"><div class="enm">${e.name}</div><div class="edt">${fmtD(e.date)}</div></div>
+      <div class="eart">-₺${fmt(e.amount)}</div>
+      <button class="bdel" onclick="delExp(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+const BADGES = [
+  {e:'🐣',n:'İlk Adım',      d:'İlk birikimini yaptın',          c:_=>bal()>0},
+  {e:'📅',n:'1 Hafta',        d:'Haftalık harçlık ayarladın',     c:s=>s.ri.amount>0},
+  {e:'💯',n:'100 TL Kulübü',  d:'100 TL biriktirdin',             c:_=>bal()>=100},
+  {e:'💰',n:'500 TL Ustası',  d:'500 TL biriktirdin',             c:_=>bal()>=500},
+  {e:'🏦',n:'Bin TL!',        d:'1000 TL biriktirdin',            c:_=>bal()>=1000},
+  {e:'🎯',n:'Hayalci',        d:'İlk hedefinizi ekledin',         c:s=>s.goals.length>0},
+  {e:'🏆',n:'Hedefe Ulaştı',  d:'Bir hedefe yeterince biriktirdin',c:s=>s.goals.some(g=>bal()>=Number(g.price))},
+  {e:'🎁',n:'Bonus Avcısı',   d:'İlk bonusunu aldın',             c:s=>s.bonuses.length>0},
+  {e:'🧘',n:'Tasarrufçu',     d:'Hiç harcama yapmadın',           c:s=>s.expenses.length===0&&bal()>0},
+];
+function renderBadges() {
+  const cnt = BADGES.filter(b=>b.c(S)).length;
+  document.getElementById('btxt').textContent=`🏆 ${cnt}`;
+  document.getElementById('bpill').style.display = cnt>0?'block':'none';
+  document.getElementById('bgrid').innerHTML = BADGES.map(b => {
+    const ok=b.c(S);
+    return `<div class="bcard ${ok?'earn':'lock'}">
+      <span class="bem">${b.e}</span>
+      <div class="bbn">${b.n}</div>
+      <div class="bbd">${b.d}</div>
+      ${ok?'<div class="bbok">✓ Kazanıldı!</div>':''}
+    </div>`;
+  }).join('');
+}
+
+/* ── NOTIFICATIONS ── */
+function renderNotifPrompt() {
+  const el = document.getElementById('nprompt');
+  if (!el) return;
+  const needsUrls = S.goals.some(g=>g.url);
+  const granted   = ('Notification' in window && Notification.permission==='granted');
+  const dismissed = localStorage.getItem('kumbara-notif-dismissed');
+  el.style.display = (needsUrls && !granted && !dismissed) ? 'flex' : 'none';
+}
+
+async function askNotif() {
+  if (!('Notification' in window)) { toast('Bu cihazda bildirim desteklenmiyor','⚠️'); return; }
+  const p = await Notification.requestPermission();
+  if (p==='granted') {
+    toast('Bildirimler aktif! Fiyat değişimlerinde haberdar olacaksın 🔔','✅');
+    try { new Notification('KartunPARA ⭐',{body:'Bildirimler açıldı! Harika birikim yapıyorsun 🌟'}); } catch(_){}
+  } else {
+    localStorage.setItem('kumbara-notif-dismissed','1');
+    toast('İptal edildi. Ayarlardan sonra açabilirsin.','ℹ️');
+  }
+  renderNotifPrompt();
+}
+
+function showPriceAlert(g, newP, oldP, isRise) {
+  const pct = Math.abs(((newP-oldP)/oldP)*100).toFixed(0);
+  // In-app banner
+  const bnr = document.getElementById('nbnr');
+  const div = document.createElement('div');
+  div.className = `nbi ${isRise?'rise':'drop'}`;
+  div.innerHTML = `
+    <div class="nbico">${isRise?'📈':'📉'}</div>
+    <div class="nbtxt">
+      <div class="nbt">${g.emoji} ${g.name} — Fiyat %${pct} ${isRise?'Arttı':'Düştü'}!</div>
+      <div class="nbs">₺${fmt(oldP)} → ₺${fmt(newP)}</div>
+    </div>
+    <button class="nbx" onclick="this.closest('.nbi').remove()">✕</button>`;
+  bnr.innerHTML=''; bnr.appendChild(div);
+  setTimeout(()=>{ if(div.parentElement) div.remove(); }, 7000);
+  // Native push
+  if ('Notification' in window && Notification.permission==='granted') {
+    try {
+      new Notification(`KartunPARA: ${g.emoji} ${g.name}`, {
+        body:`Fiyat %${pct} ${isRise?'arttı':'düştü'}! ₺${fmt(oldP)} → ₺${fmt(newP)}`,
+        tag:'kumbara-'+g.name,
+      });
+    } catch(_){}
+  }
+}
+
+/* ── FETCH PRICE ── */
+async function fetchPrice(idx) {
+  const g = S.goals[idx];
+  if (!g.url) return;
+  const lel = document.getElementById('chl-'+idx);
+  if (lel) lel.innerHTML='<span>⏳ Fiyat çekiliyor…</span>';
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514', max_tokens:300,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:`"${g.name}" ürününün şu anki Türkiye'deki en düşük fiyatı nedir? URL: ${g.url}\nSadece sayı yaz. Örnek: 8999`}]
+      })
+    });
+    if (!resp.ok) throw new Error('api');
+    const data = await resp.json();
+    const txt  = data.content.map(c=>c.text||'').join('').trim();
+    const m    = txt.match(/[\d.,]+/);
+    if (!m) throw new Error('no price');
+    let ps = m[0];
+    if (ps.includes(',')&&ps.includes('.')) ps=ps.replace(/\./g,'').replace(',','.');
+    else if (ps.includes(',')) ps=ps.replace(',','.');
+    const price = parseFloat(ps);
+    if (isNaN(price)||price<10) throw new Error('invalid');
+
+    const prevP = g.priceHistory?.length ? g.priceHistory[g.priceHistory.length-1].price : null;
+    if (!g.priceHistory) g.priceHistory=[];
+    const lbl = new Date().toLocaleDateString('tr-TR',{day:'2-digit',month:'short'});
+    const last = g.priceHistory[g.priceHistory.length-1];
+    if (last && last.date===lbl) g.priceHistory[g.priceHistory.length-1].price=price;
+    else g.priceHistory.push({date:lbl,price});
+    if (g.priceHistory.length>30) g.priceHistory=g.priceHistory.slice(-30);
+
+    await save(); renderGoals(); renderStrip();
+
+    if (prevP !== null && price !== prevP) {
+      showPriceAlert(g, price, prevP, price>prevP);
+    } else {
+      toast(`${g.emoji} ${g.name}: ₺${fmt(price)}`,'📊');
+    }
+  } catch(err) {
+    console.error(err);
+    simulatePrice(idx);
+  }
+}
+
+function simulatePrice(idx) {
+  const g = S.goals[idx];
+  if (!g.priceHistory) g.priceHistory=[];
+  if (g.priceHistory.length>0) { toast('Fiyat çekilemedi, mevcut veriler gösteriliyor','⚠️'); return; }
+  const base=g.price, now=new Date();
+  for (let d=13;d>=0;d--) {
+    const dt=new Date(now); dt.setDate(dt.getDate()-d);
+    const lbl=dt.toLocaleDateString('tr-TR',{day:'2-digit',month:'short'});
+    g.priceHistory.push({date:lbl, price:Math.round(base*(0.92+Math.random()*.16)/10)*10});
+  }
+  save(); renderGoals(); renderStrip();
+  toast(`${g.emoji} Örnek grafik oluşturuldu`,'📊');
+}
+
+async function autoRefresh() {
+  let last=0;
+  try { last=parseInt(localStorage.getItem('kumbara-lastref')||'0'); } catch(_){}
+  if (Date.now()-last < 24*36e5) return;
+  let any=false;
+  for (let i=0;i<S.goals.length;i++) { if(S.goals[i].url){await fetchPrice(i);any=true;} }
+  if (any) try { localStorage.setItem('kumbara-lastref',String(Date.now())); } catch(_){}
+}
+
+/* ── ACTIONS ── */
+async function saveRI() {
+  const a=parseFloat(document.getElementById('ri-a').value);
+  const d=document.getElementById('ri-d').value;
+  if (!a||!d) return toast('Tutar ve tarih gerekli!','⚠️');
+  const p=cntB(); S.ri={amount:a,startDate:d};
+  await save(); renderAll(); closeM('ri'); toast(`₺${fmt(a)} haftalık harçlık kaydedildi!`,'💵'); chkB(p);
+}
+
+async function addBonus() {
+  const n=document.getElementById('bon-n').value.trim();
+  const a=parseFloat(document.getElementById('bon-a').value);
+  const d=document.getElementById('bon-d').value;
+  const e=document.querySelector('#ep-bon .eo.sel')?.dataset.e||'🎁';
+  if (!n||!a) return toast('Ad ve tutar gerekli!','⚠️');
+  const p=cntB(); S.bonuses.push({name:n,amount:a,date:d||tod(),emoji:e});
+  await save(); renderAll(); closeM('bon');
+  toast(`+₺${fmt(a)} bonus eklendi!`,'🎁'); confetti(); chkB(p);
+  document.getElementById('bon-n').value=''; document.getElementById('bon-a').value='';
+}
+async function delBonus(i) { S.bonuses.splice(i,1); await save(); renderAll(); }
+
+async function addGoal() {
+  const n=document.getElementById('gl-n').value.trim();
+  const p=parseFloat(document.getElementById('gl-p').value);
+  const u=document.getElementById('gl-u').value.trim();
+  const e=document.querySelector('#ep-gl .eo.sel')?.dataset.e||'🌟';
+  if (!n||!p) return toast('Ürün adı ve fiyatı gerekli!','⚠️');
+  const pb=cntB(); S.goals.push({name:n,price:p,url:u,emoji:e,priceHistory:[],addedAt:tod()});
+  await save(); renderAll(); goTab('gls'); closeM('goal');
+  toast(`${e} ${n} eklendi!`,'🎯'); chkB(pb);
+  document.getElementById('gl-n').value=''; document.getElementById('gl-p').value=''; document.getElementById('gl-u').value='';
+}
+
+function openEditGoal(i) {
+  const g=S.goals[i];
+  document.getElementById('eg-i').value=i;
+  document.getElementById('eg-n').value=g.name;
+  document.getElementById('eg-p').value=g.price;
+  document.getElementById('eg-u').value=g.url||'';
+  document.querySelectorAll('#ep-egl .eo').forEach(o=>{ o.classList.toggle('sel', o.dataset.e===g.emoji); });
+  if (!document.querySelector('#ep-egl .eo.sel')) document.querySelector('#ep-egl .eo').classList.add('sel');
+  openM('egl');
+}
+async function saveEditGoal() {
+  const i=parseInt(document.getElementById('eg-i').value);
+  const n=document.getElementById('eg-n').value.trim();
+  const p=parseFloat(document.getElementById('eg-p').value);
+  const u=document.getElementById('eg-u').value.trim();
+  const e=document.querySelector('#ep-egl .eo.sel')?.dataset.e||S.goals[i].emoji;
+  if (!n||!p) return toast('Ad ve fiyat gerekli!','⚠️');
+  S.goals[i]={...S.goals[i],name:n,price:p,url:u,emoji:e};
+  await save(); renderAll(); closeM('egl'); toast(`${e} ${n} güncellendi!`,'✏️');
+}
+async function delGoalEdit() {
+  const i=parseInt(document.getElementById('eg-i').value);
+  if (!confirm(`"${S.goals[i].name}" hedefini silmek istediğine emin misin?`)) return;
+  if (CI[i]) { CI[i].destroy(); delete CI[i]; }
+  S.goals.splice(i,1); await save(); renderAll(); closeM('egl'); toast('Hedef silindi','🗑️');
+}
+
+async function addExp() {
+  const n=document.getElementById('ex-n').value.trim();
+  const a=parseFloat(document.getElementById('ex-a').value);
+  const d=document.getElementById('ex-d').value;
+  const e=document.querySelector('#ep-ex .eo.sel')?.dataset.e||'🛍️';
+  if (!n||!a) return toast('Ad ve tutar gerekli!','⚠️');
+  S.expenses.push({name:n,amount:a,date:d||tod(),emoji:e});
+  await save(); renderAll(); closeM('expm'); toast(`₺${fmt(a)} harcama eklendi`,'🛍️');
+  document.getElementById('ex-n').value=''; document.getElementById('ex-a').value='';
+}
+async function delExp(i) { S.expenses.splice(i,1); await save(); renderAll(); }
+
+const cntB = () => BADGES.filter(b=>b.c(S)).length;
+function chkB(prev) {
+  const now=cntB();
+  if (now>prev) {
+    const nb=BADGES.filter(b=>b.c(S))[now-1];
+    setTimeout(()=>{ toast(`Yeni rozet: ${nb.e} ${nb.n}!`,'🏆'); confetti(); },600);
+  }
+}
+
+/* ── UI HELPERS ── */
+function goTab(name) {
+  ['inc','gls','exp','bdg'].forEach(t=>{
+    document.getElementById('pg-'+t).classList.toggle('active',t===name);
+    document.getElementById('tab-'+t)?.classList.toggle('active',t===name);
+    document.getElementById('nav-'+t)?.classList.toggle('active',t===name);
+  });
+}
+function openM(name) {
+  if (name==='bon' && !document.getElementById('bon-d').value) document.getElementById('bon-d').value=tod();
+  if (name==='expm' && !document.getElementById('ex-d').value) document.getElementById('ex-d').value=tod();
+  if (name==='ri') {
+    document.getElementById('ri-a').value=S.ri.amount||'';
+    document.getElementById('ri-d').value=S.ri.startDate||tod();
+  }
+  document.getElementById('m-'+name).classList.add('open');
+}
+function closeM(name) { document.getElementById('m-'+name).classList.remove('open'); }
+document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); }));
+function selE(el,grp) {
+  document.querySelectorAll(`#ep-${grp} .eo`).forEach(o=>o.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+function toast(msg, ico='ℹ️') {
+  const w=document.getElementById('tw');
+  const el=document.createElement('div'); el.className='tst';
+  el.innerHTML=`<span>${ico}</span><span>${msg}</span>`;
+  w.appendChild(el); setTimeout(()=>el.remove(),3500);
+}
+function confetti() {
+  const cols=['#9B72CF','#E89BBF','#F5C842','#72C9A8','#82C4E8'];
+  for(let i=0;i<40;i++){
+    const el=document.createElement('div'); el.className='cp';
+    el.style.cssText=`left:${Math.random()*100}vw;top:-10px;background:${cols[i%5]};width:${6+Math.random()*7}px;height:${6+Math.random()*7}px;border-radius:${Math.random()>.5?'50%':'3px'};animation-duration:${1.2+Math.random()*1.8}s;animation-delay:${Math.random()*.4}s`;
+    document.body.appendChild(el); setTimeout(()=>el.remove(),3000);
+  }
+}
+const fmt  = n => new Intl.NumberFormat('tr-TR').format(Math.round(n||0));
+const tod  = () => new Date().toISOString().split('T')[0];
+const fmtD = d => { if(!d)return''; try{return new Date(d).toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'})}catch(_){return d} };
+
+/* ── INIT ── */
+(async()=>{
+  initFirebase();
+  await load();
+  S.ri      = S.ri      || {amount:0, startDate:null};
+  S.bonuses = S.bonuses || [];
+  S.goals   = S.goals   || [];
+  S.expenses= S.expenses|| [];
+  S.ri.amount = Number(S.ri.amount) || 0;
+  S.bonuses  = S.bonuses.map(b=>({...b, amount:Number(b.amount)||0}));
+  S.expenses = S.expenses.map(e=>({...e, amount:Number(e.amount)||0}));
+  S.goals    = S.goals.map(g=>({...g, price:Number(g.price)||0}));
+
+  if (IS_PARENT) {
+    document.body.classList.add('parent-mode');
+    const banner = document.getElementById('parentBanner');
+    if (banner) banner.style.display = 'flex';
+    const upd = document.getElementById('pbLastUpdate');
+    if (upd) upd.textContent = `Son güncelleme: ${new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}`;
+    listenFirebase();
+  }
+
+  renderAll();
+  if (!IS_PARENT) setTimeout(autoRefresh, 2000);
+})();
+
+async function reloadParent() {
+  await load();
+  S.ri.amount = Number(S.ri.amount) || 0;
+  S.bonuses  = S.bonuses.map(b=>({...b, amount:Number(b.amount)||0}));
+  S.expenses = S.expenses.map(e=>({...e, amount:Number(e.amount)||0}));
+  S.goals    = S.goals.map(g=>({...g, price:Number(g.price)||0}));
+  renderAll();
+  document.getElementById('pbLastUpdate').textContent =
+    `Son güncelleme: ${new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}`;
+  toast('Veriler güncellendi','🔄');
+}
 </script>
 </body>
 </html>
