@@ -237,7 +237,7 @@ function App(){
   const [showAddExp,setShowAddExp]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState(new Date().toISOString().slice(0,7));
   const [showQuickExp,setShowQuickExp]=useState(false);
-  const [quickForm,setQuickForm]=useState({category:"Market",amount:"",payMethod:"kredi_karti",cardId:"",note:""});
+  const [quickForm,setQuickForm]=useState({category:"Market",amount:"",payMethod:"kredi_karti",cardId:"",installments:1,note:""});
   const [showAddIncome,setShowAddIncome]=useState(false);
   const [showPurchase,setShowPurchase]=useState(false);
   const [showAddRecurring,setShowAddRecurring]=useState(false);
@@ -259,7 +259,7 @@ function App(){
 
   // Kart alışverişi formu
   const blankPurchase={cardId:"",description:"",amount:"",installments:1,date:new Date().toISOString().slice(0,10)};
-  const [pForm,setPForm]=useState(blankPurchase);
+  const [pForm,setPForm]=useState({cardId:"",description:"",amount:"",installments:1,date:new Date().toISOString().slice(0,10)});
 
   // Tarih sabitleri — tüm hesaplamalardan önce
   const curMonth=new Date().toISOString().slice(0,7);
@@ -387,15 +387,20 @@ function App(){
   function deleteExp(id){if(window.confirm("Bu gideri silmek istiyor musun?"))setExpenses(p=>p.filter(e=>e.id!==id));}
 
   function savePurchase(){
-    if(!pForm.cardId||!pForm.amount)return;
-    const card=debts.find(d=>d.id===Number(pForm.cardId));
-    if(!card)return;
-    const installAmt=Math.round(Number(pForm.amount)/Number(pForm.installments));
-    // Kart borcuna ekle
-    setDebts(p=>p.map(d=>d.id===Number(pForm.cardId)?{...d,remaining:d.remaining+Number(pForm.amount),total:d.total+Number(pForm.amount)}:d));
-    // Gider olarak kaydet
-    setExpenses(p=>[...p,{id:Date.now(),category:pForm.description||"Alışveriş",amount:Number(pForm.amount),date:pForm.date,icon:"🛒",payMethod:"kredi_karti",cardId:Number(pForm.cardId),installments:Number(pForm.installments),installmentAmt}]);
-    setPForm(blankPurchase);setShowPurchase(false);
+    try{
+      if(!pForm.cardId||!pForm.amount)return;
+      const card=debts.find(d=>d.id===Number(pForm.cardId));
+      if(!card)return;
+      const amt=Number(pForm.amount);
+      const inst=Number(pForm.installments)||1;
+      const installAmt=Math.round(amt/inst);
+      const date=pForm.date||new Date().toISOString().slice(0,10);
+      const cat=pForm.description||"Alışveriş";
+      setDebts(p=>p.map(d=>d.id===Number(pForm.cardId)?{...d,remaining:d.remaining+amt,total:d.total+amt}:d));
+      setExpenses(p=>[...p,{id:Date.now(),category:cat,amount:amt,date,icon:"🛒",payMethod:"kredi_karti",cardId:Number(pForm.cardId),installments:inst,installmentAmt}]);
+      setPForm({cardId:"",description:"",amount:"",installments:1,date:new Date().toISOString().slice(0,10)});
+      setShowPurchase(false);
+    }catch(e){alert("Hata: "+e.message);}
   }
 
   function updateUserPayment(id,val){setDebts(p=>p.map(d=>d.id===id?{...d,userPayment:Math.max(0,Number(val))}:d));}
@@ -404,16 +409,18 @@ function App(){
     if(!quickForm.amount||!quickForm.category)return;
     const cat=CATS.find(c=>c.name===quickForm.category);
     const today=new Date().toISOString().slice(0,10);
+    const inst=Number(quickForm.installments)||1;
+    const installmentAmt=inst>1?Math.round(Number(quickForm.amount)/inst):Number(quickForm.amount);
     const newExp={id:Date.now(),category:quickForm.category,amount:Number(quickForm.amount),
       date:today,icon:cat?.icon||"📌",payMethod:quickForm.payMethod,
-      cardId:quickForm.cardId?Number(quickForm.cardId):null,installments:1,
+      cardId:quickForm.cardId?Number(quickForm.cardId):null,
+      installments:inst,installmentAmt,
       note:quickForm.note||""};
-    // Kart ile yapıldıysa kart borcuna da ekle
     if(quickForm.payMethod==="kredi_karti"&&quickForm.cardId){
       setDebts(p=>p.map(d=>d.id===Number(quickForm.cardId)?{...d,remaining:d.remaining+Number(quickForm.amount)}:d));
     }
     setExpenses(p=>[...p,newExp]);
-    setQuickForm(prev=>({...prev,amount:"",note:""}));
+    setQuickForm(prev=>({...prev,amount:"",note:"",installments:1}));
     setShowQuickExp(false);
   }
 
@@ -642,6 +649,18 @@ Türkçe, samimi, max 350 kelime.`;
                   </button>
                 ))}
               </div>
+              <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>Taksit Sayısı</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                {[1,2,3,4,6,9,12,18,24].map(n=>(
+                  <button key={n} onClick={()=>setQuickForm({...quickForm,installments:n})}
+                    style={{padding:"7px 12px",border:`2px solid ${quickForm.installments===n?"#c0392b":"#e0e0e0"}`,borderRadius:20,background:quickForm.installments===n?"#fdf0f0":"#fff",color:quickForm.installments===n?"#c0392b":"#555",fontSize:12,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
+                    {n===1?"Tek":n}
+                  </button>
+                ))}
+              </div>
+              {quickForm.installments>1&&quickForm.amount&&<div style={{background:"#f0fff4",borderRadius:10,padding:"8px 12px",marginBottom:10,fontSize:12,color:"#27ae60",fontWeight:700}}>
+                Aylık: {new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0}).format(Math.round(Number(quickForm.amount)/quickForm.installments))} × {quickForm.installments} ay
+              </div>}
             </>}
 
             {/* Not */}
