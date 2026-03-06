@@ -212,15 +212,33 @@ function TBadge({type}){
 }
 
 // ── MAIN APP ─────────────────────────────────────────────────────────────────
+// localStorage yardımcısı
+function useLS(key,defaultVal){
+  const [val,setVal]=React.useState(()=>{
+    try{const s=localStorage.getItem(key);return s?JSON.parse(s):defaultVal;}
+    catch{return defaultVal;}
+  });
+  const setAndSave=React.useCallback(v=>{
+    setVal(prev=>{
+      const next=typeof v==="function"?v(prev):v;
+      try{localStorage.setItem(key,JSON.stringify(next));}catch{}
+      return next;
+    });
+  },[key]);
+  return [val,setAndSave];
+}
+
 function App(){
   const [tab,setTab]=useState("ozet");
-  const [debts,setDebts]=useState(initDebts);
-  const [expenses,setExpenses]=useState(initExpenses);
-  const [recurringExp,setRecurringExp]=useState(initRecurring);
-  const [customCats,setCustomCats]=useState([]);
-  const [incomes,setIncomes]=useState(initIncomes);
-  const [salary,setSalary]=useState(81000);
-  const [salaryInput,setSalaryInput]=useState("81000");
+  const [debts,setDebts]=useLS("ft_debts",initDebts);
+  const [expenses,setExpenses]=useLS("ft_expenses",initExpenses);
+  const [recurringExp,setRecurringExp]=useLS("ft_recurring",initRecurring);
+  const [customCats,setCustomCats]=useLS("ft_cats",[]);
+  const [incomes,setIncomes]=useLS("ft_incomes",initIncomes);
+  const [salary,setSalary]=useLS("ft_salary",81000);
+  const [salaryInput,setSalaryInput]=useState(()=>{
+    try{const s=localStorage.getItem("ft_salary");return s?JSON.parse(s).toString():"81000";}catch{return "81000";}
+  });
   const [showFullPlan,setShowFullPlan]=useState(false);
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
@@ -659,6 +677,9 @@ Türkçe, samimi, max 350 kelime.`;
             </button>
             <button onClick={exportExcel} style={{background:"rgba(255,255,255,.18)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
               📊 Excel
+            </button>
+            <button onClick={()=>{if(window.confirm("Tüm veriler silinecek, emin misin?")){["ft_debts","ft_expenses","ft_recurring","ft_cats","ft_incomes","ft_salary"].forEach(k=>localStorage.removeItem(k));window.location.reload();}}} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.6)",borderRadius:10,padding:"7px 10px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
+              🔄
             </button>
           </div>
         </div>
