@@ -214,7 +214,7 @@ function TBadge({type}){
 // ── MAIN APP ─────────────────────────────────────────────────────────────────
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────────
 const SB_URL="https://blmhxmquwkiwareuhyoj.supabase.co";
-const SB_KEY="sb_publishable_Uh8ku7N1s2kdwytg85PlOA_kyzVTse4";
+const SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsbWh4bXF1d2tpd2FyZXVoeW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MDgxMDIsImV4cCI6MjA4ODM4NDEwMn0.eTCPOgAvtMVq_xzcTg3C4vY7-j12t7S-dATYxElux90";
 
 async function sbLoad(){
   try{
@@ -598,9 +598,9 @@ ${activeRecurring.length>0?`Sabit Giderler: ${activeRecurring.map(r=>`${r.catego
     setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
     const systemPrompt=`Sen samimi, yardımsever bir Türk kişisel finans danışmanısın. Kullanıcının finansal verilerine erişimin var. Kısa, net, uygulanabilir öneriler ver. Türkçe konuş.\n\n${buildFinContext()}`;
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{
+      const r=await fetch("/api/chat",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system:systemPrompt,messages:newMessages.map(m=>({role:m.role,content:m.content}))})
       });
       const d=await r.json();
@@ -643,9 +643,9 @@ Raporda şunları yaz:
 
 Türkçe, samimi, max 350 kelime.`;
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{
+      const r=await fetch("/api/chat",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
       });
       const d=await r.json();setMonthlyReport(d.content?.[0]?.text||"Yanıt alınamadı.");
