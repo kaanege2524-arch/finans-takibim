@@ -212,14 +212,38 @@ function TBadge({type}){
 }
 
 // ── MAIN APP ─────────────────────────────────────────────────────────────────
-// localStorage yardımcısı
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────────
+const SB_URL="https://blmhxmquwkiwareuhyoj.supabase.co";
+const SB_KEY="sb_publishable_Uh8ku7N1s2kdwytg85PlOA_kyzVTse4";
+
+async function sbLoad(){
+  try{
+    const r=await fetch(SB_URL+"/rest/v1/finans_data?id=eq.main&select=data",{
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
+    });
+    const d=await r.json();
+    return d&&d[0]?d[0].data:null;
+  }catch(e){console.warn("sbLoad err",e);return null;}
+}
+
+async function sbSave(data){
+  try{
+    await fetch(SB_URL+"/rest/v1/finans_data?id=eq.main",{
+      method:"PATCH",
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({data:data,updated_at:new Date().toISOString()})
+    });
+  }catch(e){console.warn("sbSave err",e);}
+}
+
+// localStorage (offline backup)
 function useLS(key,defaultVal){
   const [val,setVal]=React.useState(()=>{
     try{const s=localStorage.getItem(key);return s?JSON.parse(s):defaultVal;}
     catch{return defaultVal;}
   });
-  const setAndSave=React.useCallback(v=>{
-    setVal(prev=>{
+  const setAndSave=React.useCallback(function(v){
+    setVal(function(prev){
       const next=typeof v==="function"?v(prev):v;
       try{localStorage.setItem(key,JSON.stringify(next));}catch{}
       return next;
@@ -228,8 +252,10 @@ function useLS(key,defaultVal){
   return [val,setAndSave];
 }
 
+
 function App(){
   const [tab,setTab]=useState("ozet");
+  const [sbStatus,setSbStatus]=useState("⏳");// ⏳ yükleniyor, ✅ senkron, ⚠️ hata
   const [debts,setDebts]=useLS("ft_debts",initDebts);
   const [expenses,setExpenses]=useLS("ft_expenses",initExpenses);
   const [recurringExp,setRecurringExp]=useLS("ft_recurring",initRecurring);
@@ -239,6 +265,32 @@ function App(){
   const [salaryInput,setSalaryInput]=useState(()=>{
     try{const s=localStorage.getItem("ft_salary");return s?JSON.parse(s).toString():"81000";}catch{return "81000";}
   });
+
+  // ── SUPABASE: İlk açılışta yükle ──────────────────────────────────────
+  useEffect(()=>{
+    sbLoad().then(d=>{
+      if(!d){setSbStatus("✅");return;}
+      if(d.debts)setDebts(d.debts);
+      if(d.expenses)setExpenses(d.expenses);
+      if(d.recurringExp)setRecurringExp(d.recurringExp);
+      if(d.customCats)setCustomCats(d.customCats);
+      if(d.incomes)setIncomes(d.incomes);
+      if(d.salary){setSalary(d.salary);setSalaryInput(String(d.salary));}
+      setSbStatus("✅");
+    }).catch(()=>setSbStatus("⚠️"));
+  },[]);
+
+  // ── SUPABASE: Veri değişince kaydet (1sn debounce) ────────────────────
+  const sbSaveTimer=useRef(null);
+  useEffect(()=>{
+    clearTimeout(sbSaveTimer.current);
+    sbSaveTimer.current=setTimeout(()=>{
+      sbSave({debts,expenses,recurringExp,customCats,incomes,salary})
+        .then(()=>setSbStatus("✅")).catch(()=>setSbStatus("⚠️"));
+    },1000);
+    return ()=>clearTimeout(sbSaveTimer.current);
+  },[debts,expenses,recurringExp,customCats,incomes,salary]);
+
   const [showFullPlan,setShowFullPlan]=useState(false);
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
@@ -668,7 +720,7 @@ Türkçe, samimi, max 350 kelime.`;
       <div style={{background:"linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#c0392b 100%)",padding:"20px 16px 24px",color:"#fff"}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
           <div>
-            <div style={{fontSize:11,opacity:.65,marginBottom:2}}>Hoş geldin 👋</div>
+            <div style={{fontSize:11,opacity:.65,marginBottom:2}}>Hoş geldin 👋 <span style={{fontSize:10,marginLeft:4}}>{sbStatus}</span></div>
             <div style={{fontSize:17,fontWeight:800}}>Finans Takibim</div>
           </div>
           <div style={{display:"flex",gap:6}}>
