@@ -34,7 +34,7 @@ window.addEventListener('load', function() {
 </script>
 
 <script id="app-code" type="text/plain">
-const {useState,useRef,useMemo}=React;
+const {useState,useRef,useMemo,useEffect,useCallback}=React;
 
 // ── Hafif SVG grafik bileşenleri (Recharts yerine) ────────────────────────
 function PieChart({data,colors}){
@@ -219,8 +219,11 @@ const SB_KEY="sb_publishable_Uh8ku7N1s2kdwytg85PlOA_kyzVTse4";
 async function sbLoad(){
   try{
     const r=await fetch(SB_URL+"/rest/v1/finans_data?id=eq.main&select=data",{
-      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
+      method:"GET",
+      mode:"cors",
+      headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"}
     });
+    if(!r.ok)return null;
     const d=await r.json();
     return d&&d[0]?d[0].data:null;
   }catch(e){console.warn("sbLoad err",e);return null;}
@@ -228,11 +231,13 @@ async function sbLoad(){
 
 async function sbSave(data){
   try{
-    await fetch(SB_URL+"/rest/v1/finans_data?id=eq.main",{
+    const r=await fetch(SB_URL+"/rest/v1/finans_data?id=eq.main",{
       method:"PATCH",
+      mode:"cors",
       headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
       body:JSON.stringify({data:data,updated_at:new Date().toISOString()})
     });
+    if(!r.ok)console.warn("sbSave status",r.status);
   }catch(e){console.warn("sbSave err",e);}
 }
 
@@ -242,7 +247,7 @@ function useLS(key,defaultVal){
     try{const s=localStorage.getItem(key);return s?JSON.parse(s):defaultVal;}
     catch{return defaultVal;}
   });
-  const setAndSave=React.useCallback(function(v){
+  const setAndSave=useCallback(function(v){
     setVal(function(prev){
       const next=typeof v==="function"?v(prev):v;
       try{localStorage.setItem(key,JSON.stringify(next));}catch{}
@@ -269,14 +274,16 @@ function App(){
   // ── SUPABASE: İlk açılışta yükle ──────────────────────────────────────
   useEffect(()=>{
     sbLoad().then(d=>{
-      if(!d){setSbStatus("✅");return;}
-      if(d.debts)setDebts(d.debts);
-      if(d.expenses)setExpenses(d.expenses);
-      if(d.recurringExp)setRecurringExp(d.recurringExp);
-      if(d.customCats)setCustomCats(d.customCats);
-      if(d.incomes)setIncomes(d.incomes);
-      if(d.salary){setSalary(d.salary);setSalaryInput(String(d.salary));}
-      setSbStatus("✅");
+      if(!d||typeof d!=="object"){setSbStatus("✅");return;}
+      try{
+        if(Array.isArray(d.debts)&&d.debts.length)setDebts(d.debts);
+        if(Array.isArray(d.expenses))setExpenses(d.expenses);
+        if(Array.isArray(d.recurringExp))setRecurringExp(d.recurringExp);
+        if(Array.isArray(d.customCats))setCustomCats(d.customCats);
+        if(Array.isArray(d.incomes))setIncomes(d.incomes);
+        if(d.salary&&Number(d.salary)>0){setSalary(Number(d.salary));setSalaryInput(String(d.salary));}
+        setSbStatus("✅");
+      }catch(e){console.warn("state set err",e);setSbStatus("⚠️");}
     }).catch(()=>setSbStatus("⚠️"));
   },[]);
 
