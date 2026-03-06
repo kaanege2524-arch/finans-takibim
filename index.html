@@ -223,6 +223,13 @@ function App(){
   const [salaryInput,setSalaryInput]=useState("81000");
   const [showFullPlan,setShowFullPlan]=useState(false);
   const [suggApplied,setSuggApplied]=useState(false);
+  const [chatMessages,setChatMessages]=useState([]);
+  const [chatInput,setChatInput]=useState("");
+  const [chatLoading,setChatLoading]=useState(false);
+  const [monthlyReport,setMonthlyReport]=useState(null);
+  const [reportLoading,setReportLoading]=useState(false);
+  const chatEndRef=useRef(null);
+  const chatInputRef=useRef(null);
 
   // Modals / forms
   const [editDebtId,setEditDebtId]=useState(null);      // borç düzenleme
@@ -418,6 +425,85 @@ function App(){
 
 
 
+  // ── AI ────────────────────────────────────────────────────────────────────
+  const API_KEY="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";
+
+  function buildFinContext(){
+    return `[FİNANSAL DURUM - ${new Date().toLocaleDateString('tr-TR')}]
+Gelir: ${fmt(totalIncome)} (Maaş: ${fmt(salary)}${thisMonthExtra>0?` + Ek: ${fmt(thisMonthExtra)}`:""}))
+Toplam Borç: ${fmt(totalDebt)} | Aylık Ödeme: ${fmt(totalMonthly)} (%${debtRatio} gelir)
+Bu Ay Gider: ${fmt(totalExpenses)} | Net Kalan: ${fmt(freeIncome)}
+Borçlar:
+${debts.map(d=>`  • ${d.name} [${d.type==="kredi"?"Kredi":d.type==="kredi_karti"?"K.Kartı":"KMH"}]: ${fmt(d.remaining)} kalan, %${d.rate} faiz, aylık ${fmt(d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly)}`).join("\n")}
+${activeRecurring.length>0?`Sabit Giderler: ${activeRecurring.map(r=>`${r.category} ${fmt(r.amount)}`).join(", ")}`:""}`; 
+  }
+
+  async function sendChat(){
+    const msg=chatInput.trim();
+    if(!msg||chatLoading)return;
+    setChatInput("");
+    const userMsg={role:"user",content:msg,time:new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})};
+    const newMessages=[...chatMessages,userMsg];
+    setChatMessages(newMessages);
+    setChatLoading(true);
+    setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
+    const systemPrompt=`Sen samimi, yardımsever bir Türk kişisel finans danışmanısın. Kullanıcının finansal verilerine erişimin var. Kısa, net, uygulanabilir öneriler ver. Türkçe konuş.\n\n${buildFinContext()}`;
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system:systemPrompt,messages:newMessages.map(m=>({role:m.role,content:m.content}))})
+      });
+      const d=await r.json();
+      setChatMessages(prev=>[...prev,{role:"assistant",content:d.content?.[0]?.text||"Yanıt alınamadı.",time:new Date().toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'})}]);
+    }catch(e){setChatMessages(prev=>[...prev,{role:"assistant",content:"Bağlantı hatası: "+e.message,time:""}]);}
+    setChatLoading(false);
+    setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
+  }
+
+  async function getMonthlyReport(){
+    setReportLoading(true);setMonthlyReport(null);
+    const prevDate=new Date(new Date().setMonth(new Date().getMonth()-1));
+    const prevKey=`${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+    const prevExp=allExpenses.filter(e=>e.date.slice(0,7)===prevKey);
+    const prevTotal=prevExp.reduce((s,e)=>s+e.amount,0);
+    const prevCats={};prevExp.forEach(e=>{prevCats[e.category]=(prevCats[e.category]||0)+e.amount;});
+    const prompt=`Sen bir Türk kişisel finans danışmanısın. Aşağıdaki verilere göre aylık finansal rapor hazırla.
+
+RAPOR DÖNEMİ: ${MONTHS[prevDate.getMonth()]} ${prevDate.getFullYear()}
+
+GELİR: Maaş ${fmt(salary)} + Ek ${fmt(thisMonthExtra)} = ${fmt(totalIncome)}
+BORÇ ÖDEMELERİ: ${fmt(totalMonthly)} (gelirin %${debtRatio}'i)
+${debts.map(d=>`  - ${d.name}: ${fmt(d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly)}`).join('\n')}
+
+GEÇEN AY GİDERLER: ${fmt(prevTotal)}
+${Object.entries(prevCats).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`  - ${k}: ${fmt(v)}`).join('\n')}
+
+SABİT GİDERLER: ${fmt(activeRecurring.reduce((s,r)=>s+r.amount,0))}
+${activeRecurring.map(r=>`  - ${r.category}: ${fmt(r.amount)}`).join('\n')}
+
+NET KALAN: ${fmt(totalIncome-totalMonthly-prevTotal)}
+TOPLAM BORÇ: ${fmt(totalDebt)}
+
+Raporda şunları yaz:
+1. 📊 Genel değerlendirme (2 cümle)
+2. 💸 En yüksek 3 gider kalemi ve yorum
+3. ⚠️ Dikkat edilmesi gereken noktalar
+4. ✅ Olumlu gelişmeler
+5. 🎯 Gelecek ay için 3 somut öneri
+
+Türkçe, samimi, max 350 kelime.`;
+    try{
+      const r=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
+      });
+      const d=await r.json();setMonthlyReport(d.content?.[0]?.text||"Yanıt alınamadı.");
+    }catch(e){setMonthlyReport("Bağlantı hatası: "+e.message);}
+    setReportLoading(false);
+  }
+
   // ── EXCEL EXPORT ──────────────────────────────────────────────────────────
   function exportExcel(){
     const wb=XLSX.utils.book_new();
@@ -609,6 +695,8 @@ function App(){
         <Tab label="💸 Giderler" active={tab==="giderler"} onClick={()=>setTab("giderler")}/>
         <Tab label="💡 Öneri"    active={tab==="oneri"}    onClick={()=>setTab("oneri")}/>
         <Tab label="📅 Plan"     active={tab==="plan"}     onClick={()=>setTab("plan")}/>
+        <Tab label="📋 Rapor"    active={tab==="rapor"}    onClick={()=>setTab("rapor")}/>
+        <Tab label="🤖 AI"       active={tab==="ai"}       onClick={()=>setTab("ai")}/>
       </div>
 
       <div style={{padding:"14px 13px"}} className="slide-in">
@@ -1345,6 +1433,137 @@ function App(){
             </div>
           </Card>
           <button onClick={exportExcel} style={btnS("#27ae60")}>📊 Ödeme Planını Excel'e Aktar</button>
+        </>}
+
+        {/* ══ AYLIK RAPOR ══════════════════════════════════════════════════ */}
+        {tab==="rapor"&&<>
+          <Card style={{background:"linear-gradient(135deg,#1a237e,#283593)",color:"#fff",padding:"18px 16px"}}>
+            <div style={{fontSize:22,marginBottom:6}}>📋</div>
+            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Aylık Finansal Rapor</div>
+            <div style={{fontSize:11,opacity:.8,lineHeight:1.7,marginBottom:14}}>Bir önceki aya ait tüm veriler AI tarafından analiz edilir.</div>
+            <button onClick={getMonthlyReport} disabled={reportLoading} style={{...btnP,background:"#3949ab",opacity:reportLoading?.7:1,fontSize:14,padding:"13px"}}>
+              {reportLoading?"⏳ Rapor hazırlanıyor...":"📊 Aylık Raporu Oluştur"}
+            </button>
+          </Card>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
+            {[[`💰 ${fmt(totalIncome)}`,"Gelir","#27ae60","#f0fff4"],[`💸 ${fmt(totalMonthly)}`,"Borç Öd.","#e67e22","#fff8f0"],[`🧾 ${fmt(totalExpenses)}`,"Gider","#e74c3c","#fff5f5"],[`✅ ${fmt(freeIncome)}`,"Net Kalan",freeIncome>=0?"#27ae60":"#e74c3c",freeIncome>=0?"#f0fff4":"#fff5f5"]].map(([v,l,c,bg])=>(
+              <div key={l} style={{background:bg,borderRadius:14,padding:"12px 13px",border:`1px solid ${c}22`}}>
+                <div style={{fontSize:10,color:"#888",marginBottom:4}}>{l}</div>
+                <div style={{fontSize:14,fontWeight:800,color:c}}>{v}</div>
+              </div>
+            ))}
+          </div>
+          {activeRecurring.length>0&&<Card style={{background:"#f9f0ff",border:"1px solid #d7bef5"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#8e44ad",marginBottom:10}}>🔄 Sabit Giderler</div>
+            {activeRecurring.map(r=>{
+              const elapsed=new Date().getFullYear()*12+new Date().getMonth()-(new Date(r.startDate).getFullYear()*12+new Date(r.startDate).getMonth())+1;
+              const remaining=r.totalMonths-elapsed+1;
+              return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #e8d5f5"}}>
+                <div>
+                  <div style={{fontSize:12,fontWeight:600}}>{r.icon} {r.category}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>{elapsed}/{r.totalMonths} ay · {remaining} ay kaldı</div>
+                  <div style={{background:"#e8d5f5",borderRadius:99,height:4,width:100,marginTop:3,overflow:"hidden"}}>
+                    <div style={{width:`${Math.min(100,(elapsed/r.totalMonths)*100)}%`,height:"100%",background:"#8e44ad",borderRadius:99}}/>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(r.amount)}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>Kalan: {fmt(r.amount*remaining)}</div>
+                </div>
+              </div>;
+            })}
+          </Card>}
+          {reportLoading&&<Card><div className="pulse" style={{textAlign:"center",padding:"24px",color:"#888",fontSize:13}}>
+            <div style={{fontSize:32,marginBottom:8}}>📊</div>Rapor hazırlanıyor...
+          </div></Card>}
+          {monthlyReport&&<Card style={{border:"2px solid #c5cae9"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#1a237e"}}>📋 Aylık Rapor</div>
+              <button onClick={()=>{const el=document.createElement('a');el.href='data:text/plain;charset=utf-8,'+encodeURIComponent(monthlyReport);el.download=`Rapor_${curMonth}.txt`;el.click();}} style={{fontSize:11,background:"#e8eaf6",color:"#3949ab",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>💾 İndir</button>
+            </div>
+            <div style={{fontSize:13,lineHeight:1.9,color:"#333",whiteSpace:"pre-wrap"}}>{monthlyReport}</div>
+          </Card>}
+          {!monthlyReport&&!reportLoading&&<Card style={{background:"#f8f9ff",border:"1px solid #c5cae9"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#3949ab",marginBottom:8}}>💡 Rapor Neler İçerir?</div>
+            {["Geçen aya ait gelir-gider analizi","En yüksek harcama kalemleri","Borç ödeme durumu değerlendirmesi","Dikkat edilmesi gereken noktalar","Gelecek ay için somut öneriler"].map((t,i)=>(
+              <div key={i} style={{fontSize:12,color:"#555",padding:"5px 0",display:"flex",gap:8,borderBottom:"1px solid #e8eaf6"}}>
+                <span style={{color:"#3949ab"}}>✓</span><span>{t}</span>
+              </div>
+            ))}
+          </Card>}
+        </>}
+
+        {/* ══ AI SOHBET ════════════════════════════════════════════════════ */}
+        {tab==="ai"&&<>
+          <Card style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",color:"#fff",padding:"14px 16px",marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:38,height:38,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🤖</div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800}}>Finans Asistanın</div>
+                  <div style={{fontSize:10,opacity:.65,display:"flex",alignItems:"center",gap:4}}>
+                    <div style={{width:6,height:6,borderRadius:"50%",background:"#2ecc71"}}/>
+                    Finansal verilerini biliyor · Her an sohbet et
+                  </div>
+                </div>
+              </div>
+              {chatMessages.length>0&&<button onClick={()=>setChatMessages([])} style={{background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>🗑 Temizle</button>}
+            </div>
+          </Card>
+          {chatMessages.length===0&&<div style={{marginBottom:10}}>
+            <div style={{fontSize:11,color:"#888",marginBottom:8}}>💡 Hızlı sorular:</div>
+            <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {["Hangi borcumu önce kapatmalıyım?","Bu ay ne kadar tasarruf edebilirim?","Finansal durumumu değerlendirir misin?","Aylık bütçe nasıl ayarlamalıyım?","KMH'larımı kapatmak ne kadar sürer?","Avalanche yöntemiyle ödeme planı yap"].map((q,i)=>(
+                <button key={i} onClick={()=>{setChatInput(q);setTimeout(()=>chatInputRef.current?.focus(),50);}}
+                  style={{background:"#fff",border:"1.5px solid #e0e0e0",borderRadius:20,padding:"6px 12px",fontSize:11,color:"#444",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>}
+          <div style={{background:"#fff",borderRadius:16,boxShadow:"0 2px 16px rgba(0,0,0,.06)",marginBottom:10,overflow:"hidden"}}>
+            <div style={{maxHeight:420,overflowY:"auto",padding:"14px 13px",display:"flex",flexDirection:"column",gap:10,minHeight:chatMessages.length===0?100:0}}>
+              {chatMessages.length===0&&<div style={{textAlign:"center",padding:"16px 0",color:"#ccc"}}>
+                <div style={{fontSize:28,marginBottom:6}}>💬</div>
+                <div style={{fontSize:13}}>Finansal durumun hakkında sormak istediğin bir şey var mı?</div>
+              </div>}
+              {chatMessages.map((m,i)=>{
+                const isUser=m.role==="user";
+                return <div key={i} style={{display:"flex",flexDirection:isUser?"row-reverse":"row",gap:8,alignItems:"flex-end"}}>
+                  {!isUser&&<div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>🤖</div>}
+                  <div style={{maxWidth:"80%"}}>
+                    <div style={{padding:"10px 13px",borderRadius:isUser?"16px 16px 4px 16px":"16px 16px 16px 4px",background:isUser?"linear-gradient(135deg,#c0392b,#922b21)":"#f5f5f5",color:isUser?"#fff":"#333",fontSize:13,lineHeight:1.6,whiteSpace:"pre-wrap",wordBreak:"break-word"}}>{m.content}</div>
+                    {m.time&&<div style={{fontSize:9,color:"#bbb",marginTop:3,textAlign:isUser?"right":"left"}}>{m.time}</div>}
+                  </div>
+                </div>;
+              })}
+              {chatLoading&&<div style={{display:"flex",gap:8,alignItems:"flex-end"}}>
+                <div style={{width:28,height:28,borderRadius:"50%",background:"linear-gradient(135deg,#8e44ad,#c0392b)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
+                <div style={{padding:"10px 14px",background:"#f5f5f5",borderRadius:"16px 16px 16px 4px"}}>
+                  <div style={{display:"flex",gap:4}}>{[0,1,2].map(i=><div key={i} style={{width:7,height:7,borderRadius:"50%",background:"#bbb",animation:`pu 1.2s ${i*0.2}s infinite`}}/>)}</div>
+                </div>
+              </div>}
+              <div ref={chatEndRef}/>
+            </div>
+            <div style={{borderTop:"1px solid #f0f0f0",padding:"10px 12px",display:"flex",gap:8,alignItems:"flex-end"}}>
+              <textarea ref={chatInputRef} value={chatInput} onChange={e=>setChatInput(e.target.value)}
+                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat();}}}
+                placeholder="Sor... (Enter ile gönder)" rows={1}
+                style={{flex:1,border:"1.5px solid #e8ecf0",borderRadius:12,padding:"10px 12px",fontSize:13,fontFamily:"'Sora',sans-serif",outline:"none",resize:"none",lineHeight:1.5,maxHeight:100,overflowY:"auto",boxSizing:"border-box"}}
+                onInput={e=>{e.target.style.height="auto";e.target.style.height=Math.min(e.target.scrollHeight,100)+"px";}}/>
+              <button onClick={sendChat} disabled={chatLoading||!chatInput.trim()}
+                style={{width:42,height:42,borderRadius:"50%",background:chatInput.trim()?"linear-gradient(135deg,#c0392b,#922b21)":"#eee",border:"none",color:chatInput.trim()?"#fff":"#bbb",fontSize:18,cursor:chatInput.trim()?"pointer":"default",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                ➤
+              </button>
+            </div>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+            {[[`💰 ${fmt(totalIncome)}`,"Gelir"],[`💸 ${fmt(totalMonthly)}`,"Borç öd."],[`📊 %${debtRatio}`,"Borç/Gelir"],[`✅ ${fmt(freeIncome)}`,"Net"]].map(([v,l])=>(
+              <div key={l} style={{background:"#fff",borderRadius:20,padding:"5px 12px",fontSize:11,boxShadow:"0 1px 6px rgba(0,0,0,.06)",display:"flex",gap:5}}>
+                <span style={{fontWeight:700,color:"#1a1a2e"}}>{v}</span><span style={{color:"#aaa"}}>{l}</span>
+              </div>
+            ))}
+          </div>
         </>}
 
 
