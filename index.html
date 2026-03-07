@@ -137,6 +137,119 @@ const ICONS=["🏠","🚗","📱","💈","🎓","🏋️","🐾","💊","🔌","
 
 const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0}).format(n);
 
+
+// ── CASCADE PLANNER ──────────────────────────────────────────────────────────
+// Her ay tüm borçları birlikte hesaplar, kapanan borcun nakitini aktarır
+function buildCascadePlan(debts, salary, incomes, strategy="avalanche"){
+  const MAX_MONTHS = 120;
+  const startDate = new Date(2026, 2, 1); // Mart 2026
+
+  // Aylık gelir hesapla (bazı gelirler belirli aylarda yok)
+  function getMonthlyIncome(monthIdx){
+    const d = new Date(startDate.getFullYear(), startDate.getMonth() + monthIdx, 1);
+    const m = d.getMonth(); // 0=Ocak ... 11=Aralık
+    let total = salary;
+    incomes.forEach(inc => {
+      if(!inc.recurring) return;
+      // Ek Ders: Temmuz(6), Ağustos(7), Eylül(8) yok
+      if(inc.label && inc.label.includes("Ek Ders")){
+        if(m >= 6 && m <= 8) return; // Temmuz-Eylül yok
+      }
+      total += inc.amount;
+    });
+    return total;
+  }
+
+  // Borç durumunu kopyala
+  let state = debts.map(d => ({
+    ...d,
+    rem: d.remaining,
+    done: false,
+  }));
+
+  const monthlyLog = [];
+
+  for(let mi = 0; mi < MAX_MONTHS; mi++){
+    const income = getMonthlyIncome(mi);
+    const d = new Date(startDate.getFullYear(), startDate.getMonth() + mi, 1);
+    const label = MONTHS[d.getMonth()] + " " + d.getFullYear();
+
+    // Aktif borçlar
+    const active = state.filter(d => !d.done);
+    if(active.length === 0) break;
+
+    // Sabit krediler
+    const fixed = active.filter(d => d.type === "kredi");
+    const flex = active.filter(d => d.type !== "kredi");
+
+    // Sabit kredilerin toplamı
+    const fixedTotal = fixed.reduce((s, d) => s + Math.min(d.monthly, d.rem), 0);
+
+    // Esnek borçlar için kullanılabilir nakit
+    let available = Math.max(0, income - fixedTotal);
+
+    // Strateji sıralaması
+    let sorted;
+    if(strategy === "avalanche") sorted = [...flex].sort((a,b) => b.rate - a.rate);
+    else if(strategy === "snowball") sorted = [...flex].sort((a,b) => a.rem - b.rem);
+    else sorted = [...flex]; // minimum
+
+    // Minimum ödemeleri ata
+    const pays = {};
+    fixed.forEach(d => { pays[d.id] = Math.min(d.monthly, d.rem); });
+
+    if(strategy === "minimum"){
+      sorted.forEach(d => {
+        const min = Math.min(Math.ceil(d.rem * 0.20), d.rem);
+        pays[d.id] = min;
+        available -= min;
+      });
+    } else {
+      // Önce minimum ata
+      sorted.forEach(d => {
+        const min = Math.min(Math.ceil(d.rem * 0.20), d.rem);
+        pays[d.id] = min;
+        available -= min;
+      });
+      // Kalanı öncelikli borca ver
+      for(let i = 0; i < sorted.length && available > 0; i++){
+        const add = Math.min(available, sorted[i].rem - pays[sorted[i].id]);
+        if(add > 0){ pays[sorted[i].id] += Math.round(add); available -= Math.round(add); }
+      }
+    }
+
+    // Bu ay ödemeleri uygula
+    const payments = [];
+    let monthTotal = 0;
+    state.forEach(debt => {
+      if(debt.done) return;
+      const pay = pays[debt.id] || 0;
+      const rate = debt.rate / 100;
+      let interest = 0, principal = pay;
+      if(debt.type !== "kredi"){
+        interest = Math.round(debt.rem * rate);
+        principal = Math.max(0, pay - interest);
+      }
+      principal = Math.min(principal, debt.rem);
+      debt.rem = Math.max(0, debt.rem - principal);
+      if(debt.rem <= 1) { debt.rem = 0; debt.done = true; }
+      payments.push({
+        id: debt.id, name: debt.name, type: debt.type,
+        payment: Math.round(interest + principal),
+        interest: Math.round(interest),
+        principal: Math.round(principal),
+        remaining: Math.round(debt.rem),
+        finished: debt.done,
+      });
+      monthTotal += Math.round(interest + principal);
+    });
+
+    const surplus = income - monthTotal;
+    monthlyLog.push({ label, monthIdx: mi, income, payments, total: monthTotal, surplus });
+  }
+
+  return monthlyLog;
+}
 function buildFlexPlan(debt){
   const rate=debt.rate/100;
   const pay=debt.userPayment||debt.monthly;
@@ -299,6 +412,7 @@ function App(){
   },[debts,expenses,recurringExp,customCats,incomes,salary]);
 
   const [showFullPlan,setShowFullPlan]=useState(false);
+  const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
@@ -434,34 +548,30 @@ function App(){
   const plan=useMemo(()=>masterPlan(),[debts]);
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
+  const cascadePlans=useMemo(()=>({
+    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche"),
+    snowball:  buildCascadePlan(debts, salary, incomes, "snowball"),
+    minimum:   buildCascadePlan(debts, salary, incomes, "minimum"),
+  }),[debts,salary,incomes]);
+
   const scenarios=useMemo(()=>{
-    const flexD=debts.filter(d=>d.type!=="kredi");
-    if(flexD.length===0) return [];
-    const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
-    const expTotal=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
-    const available=Math.max(0,totalIncome-fixedTotal-expTotal);
-    function calcS(sorted){
-      let rem=available; const pays={};
-      sorted.forEach(d=>{const min=Math.ceil(d.remaining*0.20);pays[d.id]=min;rem-=min;});
-      for(let i=0;i<sorted.length&&rem>0;i++){
-        const add=Math.min(rem,sorted[i].remaining-pays[sorted[i].id]);
-        if(add>0){pays[sorted[i].id]+=Math.round(add);rem-=Math.round(add);}
-      }
-      let maxM=0,totI=0;
-      sorted.forEach(d=>{const pl=buildFlexPlan({...d,userPayment:pays[d.id]||d.monthly});maxM=Math.max(maxM,pl.length);totI+=pl.reduce((s,r)=>s+(r.interest||0),0);});
-      return {pays,maxM,totI};
+    function planSummary(plan){
+      const months=plan.length;
+      const interest=plan.reduce((s,m)=>s+m.payments.reduce((ss,p)=>ss+(p.interest||0),0),0);
+      // Ilk ay ödeme dağılımı
+      const pays={};
+      if(plan[0]) plan[0].payments.forEach(p=>{ pays[p.id]=p.payment; });
+      return {months,interest,pays};
     }
-    const minPays={}; let minMaxM=0,minTotI=0;
-    flexD.forEach(d=>{minPays[d.id]=Math.ceil(d.remaining*0.20);});
-    flexD.forEach(d=>{const pl=buildFlexPlan({...d,userPayment:minPays[d.id]||d.monthly});minMaxM=Math.max(minMaxM,pl.length);minTotI+=pl.reduce((s,r)=>s+(r.interest||0),0);});
-    const av=calcS([...flexD].sort((a,b)=>b.rate-a.rate));
-    const sn=calcS([...flexD].sort((a,b)=>a.remaining-b.remaining));
+    const av=planSummary(cascadePlans.avalanche);
+    const sn=planSummary(cascadePlans.snowball);
+    const mi=planSummary(cascadePlans.minimum);
     return [
-      {label:"Minimum",emoji:"🐢",color:"#e74c3c",bg:"#fff5f5",pays:minPays,months:minMaxM,interest:minTotI,desc:"Sadece %20 minimum öde"},
-      {label:"Avalanche",emoji:"🏔",color:"#2980b9",bg:"#f0f8ff",pays:av.pays,months:av.maxM,interest:av.totI,desc:"Yüksek faizi önce bitir"},
-      {label:"Snowball",emoji:"⛄",color:"#8e44ad",bg:"#f9f0ff",pays:sn.pays,months:sn.maxM,interest:sn.totI,desc:"Küçük borcu önce bitir"},
+      {label:"Minimum",emoji:"🐢",color:"#e74c3c",bg:"#fff5f5",pays:mi.pays,months:mi.months,interest:mi.interest,desc:"Sadece %20 minimum öde",strategy:"minimum"},
+      {label:"Avalanche",emoji:"🏔",color:"#2980b9",bg:"#f0f8ff",pays:av.pays,months:av.months,interest:av.interest,desc:"Yüksek faizi önce bitir",strategy:"avalanche"},
+      {label:"Snowball",emoji:"⛄",color:"#8e44ad",bg:"#f9f0ff",pays:sn.pays,months:sn.months,interest:sn.interest,desc:"Küçük borcu önce bitir",strategy:"snowball"},
     ];
-  },[debts,allExpenses,totalIncome,curMonth]);
+  },[cascadePlans]);
 
   // ── ACTIONS ──────────────────────────────────────────────────────────────
   function saveDebt(){
@@ -1550,25 +1660,37 @@ Türkçe, samimi, max 350 kelime.`;
               </div>
             ))}
           </Card>
+          {/* Strateji seçici */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            {[["avalanche","🏔 Avalanche","#2980b9"],["snowball","⛄ Snowball","#8e44ad"],["minimum","🐢 Minimum","#e74c3c"]].map(([s,l,c])=>(
+              <button key={s} onClick={()=>setSelectedStrategy(s)} style={{flex:1,padding:"8px 4px",fontSize:11,fontWeight:700,border:`2px solid ${selectedStrategy===s?c:"#eee"}`,borderRadius:10,background:selectedStrategy===s?c:"#fff",color:selectedStrategy===s?"#fff":"#888",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
+                {l}
+              </button>
+            ))}
+          </div>
+
+          {/* Cascade takvim */}
           <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:8}}>🗓 Aylık Takvim</div>
-          {(showFullPlan?plan:plan.slice(0,6)).map(mg=>(
+          {(showFullPlan?cascadePlans[selectedStrategy]:cascadePlans[selectedStrategy].slice(0,4)).map(mg=>(
             <Card key={mg.label} style={{padding:"13px 12px"}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-                <div><div style={{fontSize:14,fontWeight:800}}>{mg.label}</div><div style={{fontSize:10,color:"#aaa"}}>{mg.payments.length} ödeme</div></div>
+                <div>
+                  <div style={{fontSize:14,fontWeight:800}}>{mg.label}</div>
+                  <div style={{fontSize:10,color:"#888"}}>Gelir: {fmt(mg.income)} · Kalan: <span style={{color:mg.surplus>=0?"#27ae60":"#e74c3c",fontWeight:700}}>{fmt(mg.surplus)}</span></div>
+                </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:15,fontWeight:800,color:"#c0392b"}}>{fmt(mg.total)}</div>
-                  <div style={{fontSize:10,color:totalIncome-mg.total>=0?"#27ae60":"#e74c3c",fontWeight:600}}>Kalan: {fmt(totalIncome-mg.total)}</div>
+                  <div style={{fontSize:10,color:"#aaa"}}>toplam ödeme</div>
                 </div>
               </div>
               {mg.payments.map((p,pi)=>{
-                const icon=p.debtType==="kredi"?"🏦":p.debtType==="kmh"?"💜":"💳";
-                const bg=p.debtType==="kredi"?"#e3f2fd":p.debtType==="kmh"?"#f3e8fd":"#fff8f0";
-                return <div key={pi} className="hover-row" style={{display:"flex",alignItems:"flex-start",padding:"7px 6px",borderRadius:8,marginBottom:2,background:bg,gap:8}}>
-                  <div style={{fontSize:17,marginTop:1}}>{icon}</div>
+                const icon=p.type==="kredi"?"🏦":p.type==="kmh"?"💜":"💳";
+                const bg=p.type==="kredi"?"#e3f2fd":p.type==="kmh"?"#f3e8fd":"#fff8f0";
+                return <div key={pi} style={{display:"flex",alignItems:"flex-start",padding:"7px 6px",borderRadius:8,marginBottom:2,background:p.finished?"#f0fff4":bg,gap:8,opacity:p.payment===0?0.4:1}}>
+                  <div style={{fontSize:17,marginTop:1}}>{p.finished?"✅":icon}</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600}}>{p.debtName}</div>
-                    <div style={{fontSize:10,color:"#888"}}>📌 {p.date}</div>
-                    {p.debtType!=="kredi"&&p.interest!=null&&<div style={{fontSize:10,color:"#aaa",marginTop:1}}>
+                    <div style={{fontSize:12,fontWeight:600}}>{p.name}{p.finished&&<span style={{fontSize:10,color:"#27ae60",marginLeft:6,fontWeight:700}}>KAPANDI 🎉</span>}</div>
+                    {p.type!=="kredi"&&<div style={{fontSize:10,color:"#aaa",marginTop:1}}>
                       Faiz: <span style={{color:"#e67e22",fontWeight:600}}>{fmt(p.interest)}</span> · Ana: <span style={{color:"#27ae60",fontWeight:600}}>{fmt(p.principal)}</span> · Kalan: {fmt(p.remaining)}
                     </div>}
                   </div>
@@ -1581,17 +1703,21 @@ Türkçe, samimi, max 350 kelime.`;
             </Card>
           ))}
           <button onClick={()=>setShowFullPlan(v=>!v)} style={{...btnS("#2c3e50"),marginBottom:12}}>
-            {showFullPlan?`▲ Daha Az Göster`:`▼ Tüm Planı Göster (${plan.length} ay)`}
+            {showFullPlan?`▲ Daha Az Göster`:`▼ Tüm Planı Göster (${cascadePlans[selectedStrategy].length} ay)`}
           </button>
+
+          {/* Özet */}
           <Card style={{background:"#f8fff8",border:"1px solid #c8e6c9"}}>
             <div style={{fontSize:13,fontWeight:700,color:"#2e7d32",marginBottom:10}}>📊 Toplam Özet</div>
             {debts.map(d=>{
-              const pl=d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d);
-              const totPaid=pl.reduce((s,r)=>s+r.payment,0);
-              const totInt=pl.reduce((s,r)=>s+(r.interest||0),0);
+              const plan=cascadePlans[selectedStrategy];
+              const lastMonth=plan.filter(m=>m.payments.find(p=>p.id===d.id&&p.payment>0)).slice(-1)[0];
+              const totPaid=plan.reduce((s,m)=>s+(m.payments.find(p=>p.id===d.id)?.payment||0),0);
+              const totInt=plan.reduce((s,m)=>s+(m.payments.find(p=>p.id===d.id)?.interest||0),0);
               return <div key={d.id} style={{padding:"8px 0",borderBottom:"1px solid #e8f5e9"}}>
                 <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
-                  <span style={{fontSize:12,fontWeight:600}}>{d.name}</span><span style={{fontSize:12,color:"#c0392b",fontWeight:700}}>{pl.length} ay</span>
+                  <span style={{fontSize:12,fontWeight:600}}>{d.name}</span>
+                  <span style={{fontSize:12,color:"#c0392b",fontWeight:700}}>{lastMonth?.label||"-"}</span>
                 </div>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:11,color:"#666"}}>
                   <span>Toplam: {fmt(totPaid)}</span>{totInt>0&&<span style={{color:"#e67e22"}}>Faiz: {fmt(totInt)}</span>}
@@ -1599,7 +1725,8 @@ Türkçe, samimi, max 350 kelime.`;
               </div>;
             })}
             <div style={{marginTop:10,display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:800}}>
-              <span>Tüm borçlardan kurtulma</span><span style={{color:"#c0392b"}}>{longestMonths} ay</span>
+              <span>Tüm borçlardan kurtulma</span>
+              <span style={{color:"#c0392b"}}>{cascadePlans[selectedStrategy].length} ay</span>
             </div>
           </Card>
           <button onClick={exportExcel} style={btnS("#27ae60")}>📊 Ödeme Planını Excel'e Aktar</button>
