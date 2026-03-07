@@ -247,13 +247,16 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
       monthTotal += Math.round(interest + principal);
     });
 
-    const surplus = income + (carryOver) - livingCost - recurringThisMonth - fixedTotal - monthTotal;
-    // Gerçek surplus: available - gerçek ödemeler
-    const realSurplus = available - (monthTotal - fixedTotal);
-    // Fazla nakiti bir sonraki aya devret
-    if(realSurplus > 0) carryOver = realSurplus;
+    // Gerçek surplus: tüm ödemeler ve yaşam gideri düşüldükten sonra kalan
+    // available = income + carryOver - fixedTotal - livingCost
+    // monthTotal = fixed + flex ödemeleri
+    const realSurplus = available - monthTotal; // available zaten fixedTotal düşülmüş, monthTotal'da fixed var
+    // NOT: available içinde fixedTotal düşüldü, ama monthTotal'da fixed ödemeler var
+    // Doğru formül: income + carryOver - livingCost - monthTotal
+    const trueSurplus = Math.max(0, income + carryOver - livingCost - monthTotal);
+    carryOver = trueSurplus;
     const additions = DEBT_ADDITIONS.filter(a=>a.month===monthStr2);
-    monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, additions, payments, total: monthTotal, surplus: Math.round(realSurplus) });
+    monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, additions, payments, total: monthTotal, surplus: Math.round(trueSurplus) });
   }
 
   return monthlyLog;
