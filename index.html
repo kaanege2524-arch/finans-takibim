@@ -430,6 +430,14 @@ function App(){
   const [showAddRecurring,setShowAddRecurring]=useState(false);
   const [showAddCat,setShowAddCat]=useState(false);
   const [showDistribute,setShowDistribute]=useState(false);
+  const [showWizard,setShowWizard]=useState(false);
+  const [wizardStep,setWizardStep]=useState(0);
+  const [wizardData,setWizardData]=useState({
+    salary:81000,
+    incomes:[],
+    debts:[],
+    recurring:[],
+  });
   const [distPays,setDistPays]=useState({});
   const [editRecurringId,setEditRecurringId]=useState(null);
 
@@ -875,8 +883,12 @@ Türkçe, samimi, max 350 kelime.`;
             <button onClick={exportExcel} style={{background:"rgba(255,255,255,.18)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
               📊 Excel
             </button>
-            <button onClick={()=>{if(window.confirm("Tüm veriler silinecek, emin misin?")){["ft_debts","ft_expenses","ft_recurring","ft_cats","ft_incomes","ft_salary"].forEach(k=>localStorage.removeItem(k));window.location.reload();}}} style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.6)",borderRadius:10,padding:"7px 10px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
-              🔄
+            <button onClick={()=>{
+              setWizardData({salary:81000,incomes:[],debts:[],recurring:[]});
+              setWizardStep(0);
+              setShowWizard(true);
+            }} style={{background:"rgba(255,165,0,.25)",border:"1px solid rgba(255,165,0,.5)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
+              🧙 Kurulum
             </button>
           </div>
         </div>
@@ -1856,6 +1868,224 @@ Türkçe, samimi, max 350 kelime.`;
 
       </div>
     </div>
+
+    {/* ══ KURULUM SİHİRBAZI ══════════════════════════════════════════════ */}
+    {showWizard&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.7)",zIndex:2000,display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"16px",overflowY:"auto"}}>
+      <div style={{background:"#fff",borderRadius:20,width:"100%",maxWidth:480,marginTop:8}}>
+        {/* Header */}
+        <div style={{background:"linear-gradient(135deg,#1a1a2e,#c0392b)",borderRadius:"20px 20px 0 0",padding:"18px 20px",color:"#fff"}}>
+          <div style={{fontSize:11,opacity:.7,marginBottom:4}}>Adım {wizardStep+1} / 6</div>
+          <div style={{fontSize:16,fontWeight:800}}>{["💰 Gelirler","💜 KMH Borçları","💳 Kredi Kartları","🏦 Sabit Krediler","🔄 Geçmiş Taksitler","✅ Özet & Onayla"][wizardStep]}</div>
+          <div style={{display:"flex",gap:4,marginTop:10}}>
+            {[0,1,2,3,4,5].map(i=><div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=wizardStep?"#fff":"rgba(255,255,255,.3)"}}/>)}
+          </div>
+        </div>
+
+        <div style={{padding:"16px 20px 20px"}}>
+
+          {/* ADIM 0: GELİRLER */}
+          {wizardStep===0&&<div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Aylık sabit gelirlerini gir</div>
+            <div style={{marginBottom:10}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:4}}>Maaş (₺)</div>
+              <input type="number" value={wizardData.salary} onChange={e=>setWizardData(p=>({...p,salary:Number(e.target.value)}))}
+                style={{width:"100%",border:"1.5px solid #ddd",borderRadius:10,padding:"10px 12px",fontSize:14,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+              <div style={{fontSize:10,color:"#aaa",marginTop:3}}>Her ayın 15'inde</div>
+            </div>
+            <div style={{fontSize:12,fontWeight:700,marginBottom:8,marginTop:16}}>Ek Gelirler</div>
+            {wizardData.incomes.map((inc,i)=>(
+              <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
+                <input placeholder="Açıklama" value={inc.label} onChange={e=>{const arr=[...wizardData.incomes];arr[i]={...arr[i],label:e.target.value};setWizardData(p=>({...p,incomes:arr}));}}
+                  style={{flex:2,border:"1.5px solid #ddd",borderRadius:8,padding:"8px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                <input type="number" placeholder="Tutar" value={inc.amount} onChange={e=>{const arr=[...wizardData.incomes];arr[i]={...arr[i],amount:Number(e.target.value)};setWizardData(p=>({...p,incomes:arr}));}}
+                  style={{flex:1,border:"1.5px solid #ddd",borderRadius:8,padding:"8px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                <button onClick={()=>setWizardData(p=>({...p,incomes:p.incomes.filter((_,j)=>j!==i)}))}
+                  style={{background:"#fdf0f0",color:"#c0392b",border:"none",borderRadius:8,padding:"8px",cursor:"pointer"}}>🗑</button>
+              </div>
+            ))}
+            <button onClick={()=>setWizardData(p=>({...p,incomes:[...p.incomes,{label:"",amount:0,recurring:true}]}))}
+              style={{width:"100%",border:"1.5px dashed #ddd",borderRadius:10,padding:"10px",fontSize:12,color:"#888",background:"none",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>+ Ek Gelir Ekle</button>
+          </div>}
+
+          {/* ADIM 1: KMH */}
+          {wizardStep===1&&<div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>KMH (Kredili Mevduat Hesabı) borçlarını gir</div>
+            {wizardData.debts.filter(d=>d.type==="kmh").map((d,i)=>{
+              const idx=wizardData.debts.indexOf(d);
+              return <div key={i} style={{background:"#f9f0ff",borderRadius:12,padding:"12px",marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <input placeholder="Banka adı (ör: İş Bankası KMH)" value={d.name} onChange={e=>{const arr=[...wizardData.debts];arr[idx]={...arr[idx],name:e.target.value};setWizardData(p=>({...p,debts:arr}));}}
+                    style={{flex:1,border:"1.5px solid #d7bef5",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                  <button onClick={()=>setWizardData(p=>({...p,debts:p.debts.filter((_,j)=>j!==idx)}))}
+                    style={{background:"none",border:"none",color:"#c0392b",cursor:"pointer",marginLeft:6,fontSize:16}}>🗑</button>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[["Güncel Borç (₺)","remaining"],["Faiz Oranı (%)","rate"],["Ödeme Günü","payDay"]].map(([lbl,key])=>(
+                    <div key={key}>
+                      <div style={{fontSize:10,color:"#888",marginBottom:3}}>{lbl}</div>
+                      <input type="number" value={d[key]||""} onChange={e=>{const arr=[...wizardData.debts];arr[idx]={...arr[idx],[key]:Number(e.target.value)};setWizardData(p=>({...p,debts:arr}));}}
+                        style={{width:"100%",border:"1.5px solid #d7bef5",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                    </div>
+                  ))}
+                </div>
+              </div>;
+            })}
+            <button onClick={()=>setWizardData(p=>({...p,debts:[...p.debts,{name:"",type:"kmh",remaining:0,rate:4.25,payDay:16,monthly:0,userPayment:0}]}))}
+              style={{width:"100%",border:"1.5px dashed #d7bef5",borderRadius:10,padding:"10px",fontSize:12,color:"#8e44ad",background:"none",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>+ KMH Ekle</button>
+          </div>}
+
+          {/* ADIM 2: KREDİ KARTLARI */}
+          {wizardStep===2&&<div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Kredi kartı borçlarını gir</div>
+            {wizardData.debts.filter(d=>d.type==="kredi_karti").map((d,i)=>{
+              const idx=wizardData.debts.indexOf(d);
+              return <div key={i} style={{background:"#fff8f0",borderRadius:12,padding:"12px",marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <input placeholder="ör: Akbank K.Kartı" value={d.name} onChange={e=>{const arr=[...wizardData.debts];arr[idx]={...arr[idx],name:e.target.value};setWizardData(p=>({...p,debts:arr}));}}
+                    style={{flex:1,border:"1.5px solid #fad7a0",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                  <button onClick={()=>setWizardData(p=>({...p,debts:p.debts.filter((_,j)=>j!==idx)}))}
+                    style={{background:"none",border:"none",color:"#c0392b",cursor:"pointer",marginLeft:6,fontSize:16}}>🗑</button>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[["Güncel Borç (₺)","remaining"],["Faiz (%)","rate"],["Kesim Günü","kesimGunu"],["Son Ödeme Günü","sonOdemeGunu"]].map(([lbl,key])=>(
+                    <div key={key}>
+                      <div style={{fontSize:10,color:"#888",marginBottom:3}}>{lbl}</div>
+                      <input type="number" value={d[key]||""} onChange={e=>{const arr=[...wizardData.debts];arr[idx]={...arr[idx],[key]:Number(e.target.value)};setWizardData(p=>({...p,debts:arr}));}}
+                        style={{width:"100%",border:"1.5px solid #fad7a0",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                    </div>
+                  ))}
+                </div>
+              </div>;
+            })}
+            <button onClick={()=>setWizardData(p=>({...p,debts:[...p.debts,{name:"",type:"kredi_karti",remaining:0,rate:4.25,kesimGunu:0,sonOdemeGunu:0,monthly:0,userPayment:0}]}))}
+              style={{width:"100%",border:"1.5px dashed #fad7a0",borderRadius:10,padding:"10px",fontSize:12,color:"#e67e22",background:"none",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>+ Kredi Kartı Ekle</button>
+          </div>}
+
+          {/* ADIM 3: SABİT KREDİLER */}
+          {wizardStep===3&&<div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Sabit taksitli kredilerini gir</div>
+            {wizardData.debts.filter(d=>d.type==="kredi").map((d,i)=>{
+              const idx=wizardData.debts.indexOf(d);
+              return <div key={i} style={{background:"#e8f4fd",borderRadius:12,padding:"12px",marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <input placeholder="ör: Garanti Bankası Kredisi" value={d.name} onChange={e=>{const arr=[...wizardData.debts];arr[idx]={...arr[idx],name:e.target.value};setWizardData(p=>({...p,debts:arr}));}}
+                    style={{flex:1,border:"1.5px solid #a9cce3",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                  <button onClick={()=>setWizardData(p=>({...p,debts:p.debts.filter((_,j)=>j!==idx)}))}
+                    style={{background:"none",border:"none",color:"#c0392b",cursor:"pointer",marginLeft:6,fontSize:16}}>🗑</button>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  {[["Kalan Borç (₺)","remaining"],["Aylık Taksit (₺)","monthly"],["Kalan Taksit Sayısı","months"],["Ödeme Günü","payDay"]].map(([lbl,key])=>(
+                    <div key={key}>
+                      <div style={{fontSize:10,color:"#888",marginBottom:3}}>{lbl}</div>
+                      <input type="number" value={d[key]||""} onChange={e=>{const arr=[...wizardData.debts];arr[idx]={...arr[idx],[key]:Number(e.target.value)};setWizardData(p=>({...p,debts:arr}));}}
+                        style={{width:"100%",border:"1.5px solid #a9cce3",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                    </div>
+                  ))}
+                </div>
+              </div>;
+            })}
+            <button onClick={()=>setWizardData(p=>({...p,debts:[...p.debts,{name:"",type:"kredi",remaining:0,monthly:0,months:0,rate:0,payDay:16}]}))}
+              style={{width:"100%",border:"1.5px dashed #a9cce3",borderRadius:10,padding:"10px",fontSize:12,color:"#2980b9",background:"none",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>+ Sabit Kredi Ekle</button>
+          </div>}
+
+          {/* ADIM 4: GEÇMİŞ TAKSİTLER */}
+          {wizardStep===4&&<div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Karta yansıyacak geçmiş taksitler</div>
+            <div style={{fontSize:11,color:"#888",marginBottom:12}}>Daha önce yaptığın taksitli alışverişlerin gelecek ay ekstresine yansıyacak tutarları</div>
+            {wizardData.recurring.map((r,i)=>(
+              <div key={i} style={{background:"#f9f9f9",borderRadius:12,padding:"12px",marginBottom:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <input placeholder="ör: Akbank - Geçmiş Taksit" value={r.category} onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],category:e.target.value};setWizardData(p=>({...p,recurring:arr}));}}
+                    style={{flex:1,border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                  <button onClick={()=>setWizardData(p=>({...p,recurring:p.recurring.filter((_,j)=>j!==i)}))}
+                    style={{background:"none",border:"none",color:"#c0392b",cursor:"pointer",marginLeft:6,fontSize:16}}>🗑</button>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                  <div>
+                    <div style={{fontSize:10,color:"#888",marginBottom:3}}>Tutar (₺)</div>
+                    <input type="number" value={r.amount||""} onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],amount:Number(e.target.value)};setWizardData(p=>({...p,recurring:arr}));}}
+                      style={{width:"100%",border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:"#888",marginBottom:3}}>Hangi aydan itibaren</div>
+                    <input type="month" value={r.startDate?.slice(0,7)||""} onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],startDate:e.target.value+"-01"};setWizardData(p=>({...p,recurring:arr}));}}
+                      style={{width:"100%",border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:"#888",marginBottom:3}}>Kaç ay sürecek</div>
+                    <input type="number" value={r.totalMonths||""} onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],totalMonths:Number(e.target.value)};setWizardData(p=>({...p,recurring:arr}));}}
+                      style={{width:"100%",border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize:10,color:"#888",marginBottom:3}}>Hangi kart</div>
+                    <select value={r.cardId||""} onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],cardId:Number(e.target.value)};setWizardData(p=>({...p,recurring:arr}));}}
+                      style={{width:"100%",border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif",boxSizing:"border-box"}}>
+                      <option value="">Kart seç</option>
+                      {wizardData.debts.filter(d=>d.type==="kredi_karti").map((d,ci)=>(
+                        <option key={ci} value={ci}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            ))}
+            <button onClick={()=>setWizardData(p=>({...p,recurring:[...p.recurring,{category:"",amount:0,startDate:"2026-04-01",totalMonths:1,cardId:"",icon:"💳",dayOfMonth:23,payMethod:"kredi_karti",note:"Geçmiş taksit"}]}))}
+              style={{width:"100%",border:"1.5px dashed #ddd",borderRadius:10,padding:"10px",fontSize:12,color:"#888",background:"none",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>+ Taksit Ekle</button>
+          </div>}
+
+          {/* ADIM 5: ÖZET */}
+          {wizardStep===5&&<div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Her şey doğru mu?</div>
+            <div style={{background:"#f8f9fa",borderRadius:12,padding:"12px",marginBottom:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#27ae60",marginBottom:6}}>💰 Gelirler</div>
+              <div style={{fontSize:12}}>Maaş: {fmt(wizardData.salary)}</div>
+              {wizardData.incomes.map((inc,i)=><div key={i} style={{fontSize:12}}>{inc.label}: {fmt(inc.amount)}</div>)}
+            </div>
+            <div style={{background:"#f8f9fa",borderRadius:12,padding:"12px",marginBottom:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#8e44ad",marginBottom:6}}>💳 Borçlar ({wizardData.debts.length} adet)</div>
+              {wizardData.debts.map((d,i)=>(
+                <div key={i} style={{fontSize:12,display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid #eee"}}>
+                  <span>{d.name}</span><span style={{fontWeight:700}}>{fmt(d.remaining)}</span>
+                </div>
+              ))}
+            </div>
+            {wizardData.recurring.length>0&&<div style={{background:"#f8f9fa",borderRadius:12,padding:"12px",marginBottom:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:"#e67e22",marginBottom:6}}>🔄 Geçmiş Taksitler ({wizardData.recurring.length} adet)</div>
+              {wizardData.recurring.map((r,i)=><div key={i} style={{fontSize:12}}>{r.category}: {fmt(r.amount)} × {r.totalMonths} ay</div>)}
+            </div>}
+            <div style={{background:"#fff3cd",borderRadius:10,padding:"10px",fontSize:11,color:"#856404",marginTop:8}}>
+              ⚠️ Onayla butonuna basınca mevcut tüm veriler silinecek ve bu verilerle yeniden başlanacak.
+            </div>
+          </div>}
+
+          {/* Butonlar */}
+          <div style={{display:"flex",gap:8,marginTop:16}}>
+            {wizardStep>0&&<button onClick={()=>setWizardStep(s=>s-1)}
+              style={{flex:1,background:"#eee",color:"#555",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>← Geri</button>}
+            {wizardStep<5&&<button onClick={()=>setWizardStep(s=>s+1)}
+              style={{flex:2,background:"#1a1a2e",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>İleri →</button>}
+            {wizardStep===5&&<button onClick={()=>{
+              // Tüm verileri uygula
+              setSalary(wizardData.salary);
+              setSalaryInput(String(wizardData.salary));
+              setIncomes(wizardData.incomes.map((inc,i)=>({...inc,id:Date.now()+i})));
+              setDebts(wizardData.debts.map((d,i)=>({
+                ...d,
+                id:Date.now()+i+100,
+                total:d.remaining,
+                userPayment:d.type!=="kredi"?Math.ceil(d.remaining*0.20):null,
+                monthly:d.type==="kredi"?d.monthly:Math.ceil(d.remaining*0.20),
+              })));
+              setRecurringExp(wizardData.recurring.map((r,i)=>({...r,id:Date.now()+i+200})));
+              setExpenses([]);
+              setShowWizard(false);
+              setWizardStep(0);
+            }} style={{flex:2,background:"#27ae60",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>✅ Onayla & Başla</button>}
+          </div>
+          <button onClick={()=>{setShowWizard(false);setWizardStep(0);}} style={{width:"100%",background:"none",border:"none",color:"#aaa",fontSize:11,cursor:"pointer",marginTop:8,fontFamily:"'Sora',sans-serif"}}>İptal</button>
+        </div>
+      </div>
+    </div>}
     {showDistribute&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
         <div style={{background:"#fff",borderRadius:20,padding:20,width:"100%",maxWidth:440,maxHeight:"80vh",overflowY:"auto"}}>
           <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>⚡ Nakiti Dağıt</div>
