@@ -140,18 +140,16 @@ const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maxi
 
 // ── CASCADE PLANNER ──────────────────────────────────────────────────────────
 // Her ay tüm borçları birlikte hesaplar, kapanan borcun nakitini aktarır
-function buildCascadePlan(debts, salary, incomes, strategy="avalanche"){
+function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCost=0){
   const MAX_MONTHS = 120;
   const startDate = new Date(2026, 2, 1); // Mart 2026
 
-  // Aylık gelir hesapla (bazı gelirler belirli aylarda yok)
   function getMonthlyIncome(monthIdx){
     const d = new Date(startDate.getFullYear(), startDate.getMonth() + monthIdx, 1);
-    const m = d.getMonth(); // 0=Ocak ... 11=Aralık
+    const m = d.getMonth();
     let total = salary;
     incomes.forEach(inc => {
       if(!inc.recurring) return;
-      // Ek Ders: Temmuz(6), Ağustos(7), Eylül(8) yok
       if(inc.label && inc.label.includes("Ek Ders")){
         if(m >= 6 && m <= 8) return; // Temmuz-Eylül yok
       }
@@ -160,13 +158,7 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche"){
     return total;
   }
 
-  // Borç durumunu kopyala
-  let state = debts.map(d => ({
-    ...d,
-    rem: d.remaining,
-    done: false,
-  }));
-
+  let state = debts.map(d => ({ ...d, rem: d.remaining, done: false }));
   const monthlyLog = [];
 
   for(let mi = 0; mi < MAX_MONTHS; mi++){
@@ -174,27 +166,21 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche"){
     const d = new Date(startDate.getFullYear(), startDate.getMonth() + mi, 1);
     const label = MONTHS[d.getMonth()] + " " + d.getFullYear();
 
-    // Aktif borçlar
     const active = state.filter(d => !d.done);
     if(active.length === 0) break;
 
-    // Sabit krediler
     const fixed = active.filter(d => d.type === "kredi");
     const flex = active.filter(d => d.type !== "kredi");
-
-    // Sabit kredilerin toplamı
     const fixedTotal = fixed.reduce((s, d) => s + Math.min(d.monthly, d.rem), 0);
 
-    // Esnek borçlar için kullanılabilir nakit
-    let available = Math.max(0, income - fixedTotal);
+    // Yaşam gideri düşüldükten sonra esnek borçlara kalan
+    let available = Math.max(0, income - fixedTotal - livingCost);
 
-    // Strateji sıralaması
     let sorted;
     if(strategy === "avalanche") sorted = [...flex].sort((a,b) => b.rate - a.rate);
     else if(strategy === "snowball") sorted = [...flex].sort((a,b) => a.rem - b.rem);
-    else sorted = [...flex]; // minimum
+    else sorted = [...flex];
 
-    // Minimum ödemeleri ata
     const pays = {};
     fixed.forEach(d => { pays[d.id] = Math.min(d.monthly, d.rem); });
 
@@ -202,23 +188,22 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche"){
       sorted.forEach(d => {
         const min = Math.min(Math.ceil(d.rem * 0.20), d.rem);
         pays[d.id] = min;
-        available -= min;
       });
     } else {
-      // Önce minimum ata
+      // Önce herkese minimum ata
+      let rem = available;
       sorted.forEach(d => {
         const min = Math.min(Math.ceil(d.rem * 0.20), d.rem);
         pays[d.id] = min;
-        available -= min;
+        rem -= min;
       });
-      // Kalanı öncelikli borca ver
-      for(let i = 0; i < sorted.length && available > 0; i++){
-        const add = Math.min(available, sorted[i].rem - pays[sorted[i].id]);
-        if(add > 0){ pays[sorted[i].id] += Math.round(add); available -= Math.round(add); }
+      // TÜM kalan nakiti öncelikli borca ver (cascade etkisi burada!)
+      for(let i = 0; i < sorted.length && rem > 0; i++){
+        const add = Math.min(rem, sorted[i].rem - pays[sorted[i].id]);
+        if(add > 0){ pays[sorted[i].id] += Math.round(add); rem -= Math.round(add); }
       }
     }
 
-    // Bu ay ödemeleri uygula
     const payments = [];
     let monthTotal = 0;
     state.forEach(debt => {
@@ -232,7 +217,7 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche"){
       }
       principal = Math.min(principal, debt.rem);
       debt.rem = Math.max(0, debt.rem - principal);
-      if(debt.rem <= 1) { debt.rem = 0; debt.done = true; }
+      if(debt.rem <= 1){ debt.rem = 0; debt.done = true; }
       payments.push({
         id: debt.id, name: debt.name, type: debt.type,
         payment: Math.round(interest + principal),
@@ -244,8 +229,8 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche"){
       monthTotal += Math.round(interest + principal);
     });
 
-    const surplus = income - monthTotal;
-    monthlyLog.push({ label, monthIdx: mi, income, payments, total: monthTotal, surplus });
+    const surplus = income - livingCost - monthTotal;
+    monthlyLog.push({ label, monthIdx: mi, income, livingCost, payments, total: monthTotal, surplus });
   }
 
   return monthlyLog;
@@ -549,10 +534,10 @@ function App(){
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
   const cascadePlans=useMemo(()=>({
-    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche"),
-    snowball:  buildCascadePlan(debts, salary, incomes, "snowball"),
-    minimum:   buildCascadePlan(debts, salary, incomes, "minimum"),
-  }),[debts,salary,incomes]);
+    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", estLiving),
+    snowball:  buildCascadePlan(debts, salary, incomes, "snowball", estLiving),
+    minimum:   buildCascadePlan(debts, salary, incomes, "minimum", estLiving),
+  }),[debts,salary,incomes,estLiving]);
 
   const scenarios=useMemo(()=>{
     function planSummary(plan){
