@@ -128,22 +128,14 @@ const BASE_CATS=[
   {name:"Eğlence",icon:"🎬"},{name:"Eğitim",icon:"📚"},{name:"Diğer",icon:"📌"},
 ];
 
-const initRecurring=[
-  // Akbank K.Kartı geçmiş taksitler
-  {id:1, category:"Akbank K.Kartı - Nisan Taksiti",  icon:"💳",amount:5700,dayOfMonth:18,startDate:"2026-04-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
-  {id:2, category:"Akbank K.Kartı - Mayıs Taksiti",  icon:"💳",amount:2400,dayOfMonth:18,startDate:"2026-05-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
-  {id:3, category:"Akbank K.Kartı - Haziran Taksiti",icon:"💳",amount:2400,dayOfMonth:18,startDate:"2026-06-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
-  {id:4, category:"Akbank K.Kartı - Temmuz Taksiti", icon:"💳",amount:770, dayOfMonth:18,startDate:"2026-07-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
-  {id:5, category:"Akbank K.Kartı - Ağustos Taksiti",icon:"💳",amount:770, dayOfMonth:18,startDate:"2026-08-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
-  {id:6, category:"Akbank K.Kartı - Eylül Taksiti",  icon:"💳",amount:770, dayOfMonth:18,startDate:"2026-09-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
-  // Garanti K.Kartı geçmiş taksitler
-  {id:7, category:"Garanti K.Kartı - Nisan Taksiti",  icon:"💳",amount:5160,dayOfMonth:23,startDate:"2026-04-01",totalMonths:1,payMethod:"kredi_karti",cardId:8,note:"Geçmiş taksitli alışveriş"},
-  {id:8, category:"Garanti K.Kartı - Mayıs Taksiti",  icon:"💳",amount:4410,dayOfMonth:23,startDate:"2026-05-01",totalMonths:1,payMethod:"kredi_karti",cardId:8,note:"Geçmiş taksitli alışveriş"},
-  {id:9, category:"Garanti K.Kartı - Haziran Taksiti",icon:"💳",amount:1460,dayOfMonth:23,startDate:"2026-06-01",totalMonths:1,payMethod:"kredi_karti",cardId:8,note:"Geçmiş taksitli alışveriş"},
-];
+const initRecurring=[];
+// Gelecek aylara yansıyacak taksitler artık cascade planner'da
+// debtAdditions olarak tutulur, ayrı recurring giriş gerekmez
+
 
 const ICONS=["🏠","🚗","📱","💈","🎓","🏋️","🐾","💊","🔌","🌐","🎵","📦","🍼","🧹","💰","📌"];
 
+const DEBT_ADDITIONS=[{"debtName": "Akbank", "month": "2026-04", "amount": 5700}, {"debtName": "Akbank", "month": "2026-05", "amount": 2400}, {"debtName": "Akbank", "month": "2026-06", "amount": 2400}, {"debtName": "Akbank", "month": "2026-07", "amount": 770}, {"debtName": "Akbank", "month": "2026-08", "amount": 770}, {"debtName": "Akbank", "month": "2026-09", "amount": 770}, {"debtName": "Garanti", "month": "2026-04", "amount": 5160}, {"debtName": "Garanti", "month": "2026-05", "amount": 4410}, {"debtName": "Garanti", "month": "2026-06", "amount": 1460}];
 const BANKS=["İş Bankası","Ziraat Bankası","Akbank","Vakıf Bank","Yapı Kredi","Garanti","Halkbank","TEB","ING","QNB Finansbank","Denizbank","Şekerbank","Diğer"];
 
 const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maximumFractionDigits:0}).format(n);
@@ -186,17 +178,16 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
     const flex = active.filter(d => d.type !== "kredi");
     const fixedTotal = fixed.reduce((s, d) => s + Math.min(d.monthly, d.rem), 0);
 
-    // Bu aya ait geçmiş taksit ödemeleri
-    const recurringThisMonth = recurringExp.filter(r => {
-      if(!r.startDate) return false;
-      const start = new Date(r.startDate);
-      const startMonthIdx = start.getFullYear()*12 + start.getMonth();
-      const curMonthIdx = d.getFullYear()*12 + d.getMonth();
-      return curMonthIdx >= startMonthIdx && curMonthIdx < startMonthIdx + (r.totalMonths||1);
-    }).reduce((s, r) => s + (r.amount||0), 0);
+    // Bu ay kart borçlarına eklenecek geçmiş taksitler
+    const monthStr2 = d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+    DEBT_ADDITIONS.filter(a=>a.month===monthStr2).forEach(a=>{
+      const debt = state.find(s=>!s.done && s.name.toLowerCase().includes(a.debtName.toLowerCase()) && s.type==="kredi_karti");
+      if(debt) debt.rem += a.amount;
+    });
 
-    // Kullanılabilir nakit = gelir + önceki aydan devir - sabit - yaşam - taksitler
-    let available = Math.max(0, income + carryOver - fixedTotal - livingCost - recurringThisMonth);
+    // Kullanılabilir nakit = gelir + önceki aydan devir - sabit kredi - yaşam gideri
+    const recurringThisMonth = 0;
+    let available = Math.max(0, income + carryOver - fixedTotal - livingCost);
     carryOver = 0; // Sıfırla, bu ay hepsini kullanacağız
 
     let sorted;
@@ -261,7 +252,8 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
     const realSurplus = available - (monthTotal - fixedTotal);
     // Fazla nakiti bir sonraki aya devret
     if(realSurplus > 0) carryOver = realSurplus;
-    monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, payments, total: monthTotal, surplus: Math.round(realSurplus) });
+    const additions = DEBT_ADDITIONS.filter(a=>a.month===monthStr2);
+    monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, additions, payments, total: monthTotal, surplus: Math.round(realSurplus) });
   }
 
   return monthlyLog;
@@ -628,8 +620,26 @@ function App(){
 
   function saveExpense(){
     if(!eForm.amount||!eForm.category)return;
-    const cat=CATS.find(c=>c.name===eForm.category);
-    const updated={...eForm,amount:Number(eForm.amount),icon:cat?.icon||"📌",cardId:eForm.cardId?Number(eForm.cardId):null,installments:Number(eForm.installments)||1};
+    const catObj=CATS.find(c=>c.name===eForm.category);
+    const amt=Number(eForm.amount);
+    const inst=Number(eForm.installments)||1;
+    if(eForm.payMethod==="kredi_karti"&&eForm.cardId){
+      const card=debts.find(d=>d.id===Number(eForm.cardId));
+      if(card){
+        const newExps=buildCardExpenses(card, eForm.category, catObj?.icon||"📌", amt, inst, eForm.date);
+        if(editExpId){
+          // Düzenleme: sadece ilk kaydı güncelle (basit)
+          setExpenses(p=>p.map(e=>e.id===editExpId?{...newExps[0],id:editExpId}:e));
+          setEditExpId(null);
+        } else {
+          setDebts(p=>p.map(d=>d.id===card.id?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
+          setExpenses(p=>[...p,...newExps]);
+        }
+        setEForm(blankExp);setShowAddExp(false);
+        return;
+      }
+    }
+    const updated={...eForm,amount:amt,icon:catObj?.icon||"📌",cardId:eForm.cardId?Number(eForm.cardId):null,installments:inst};
     if(editExpId){
       setExpenses(p=>p.map(e=>e.id===editExpId?{...e,...updated}:e));
       setEditExpId(null);
@@ -650,59 +660,46 @@ function App(){
     if(!card)return;
     const amt=Number(pForm.amount);
     const inst=Number(pForm.installments)||1;
-    const installAmt=Math.round(amt/inst);
-    const purchaseDate=new Date(pForm.date||new Date().toISOString().slice(0,10));
     const cat=pForm.description||"Alışveriş";
-    const cardId=Number(pForm.cardId);
-
-    // Kesim gününe göre ilk taksit ayını hesapla
-    // Kesim günü geçmişse bir sonraki ay ekstresine girer
-    const kesim=card.kesimGunu||1;
-    const purchaseDay=purchaseDate.getDate();
-    const purchaseMonth=purchaseDate.getMonth();
-    const purchaseYear=purchaseDate.getFullYear();
-    // Alışveriş kesim gününden önce mi sonra mı?
-    let firstBillingYear=purchaseYear;
-    let firstBillingMonth=purchaseMonth;
-    if(purchaseDay>kesim){
-      // Kesim geçmiş → bir sonraki ay ekstresine girer
-      firstBillingMonth=purchaseMonth+1;
-      if(firstBillingMonth>11){firstBillingMonth=0;firstBillingYear++;}
-    }
-
-    // Her taksit için ayrı gider kaydı oluştur
-    const newExpenses=[];
-    for(let i=0;i<inst;i++){
-      let m=firstBillingMonth+i;
-      let y=firstBillingYear;
-      while(m>11){m-=12;y++;}
-      const d=card.sonOdemeGunu||card.payDay||1;
-      const dateStr=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      newExpenses.push({
-        id:Date.now()+i,
-        category:cat,
-        amount:installAmt,
-        date:dateStr,
-        icon:"🛒",
-        payMethod:"kredi_karti",
-        cardId,
-        installments:inst,
-        installmentAmt:installAmt,
-        installmentNo:i+1,
-        totalInstallments:inst,
-        isInstallment:inst>1,
-        note:inst>1?`${i+1}/${inst}. taksit`:""
-      });
-    }
-
-    // Kart borcuna toplam tutarı ekle
-    setDebts(p=>p.map(d=>d.id===cardId?{...d,remaining:d.remaining+amt,total:d.total+amt}:d));
+    const newExpenses=buildCardExpenses(card, cat, "🛒", amt, inst, pForm.date);
+    setDebts(p=>p.map(d=>d.id===card.id?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
     setExpenses(p=>[...p,...newExpenses]);
     setPForm({cardId:"",description:"",amount:"",installments:1,date:new Date().toISOString().slice(0,10)});
     setShowPurchase(false);
   }
 
   function updateUserPayment(id,val){setDebts(p=>p.map(d=>d.id===id?{...d,userPayment:Math.max(0,Number(val))}:d));}
+
+
+  // Kredi kartı harcamasını kesim gününe göre taksit kayıtlarına dönüştür
+  function buildCardExpenses(card, category, icon, amt, inst, purchaseDateStr){
+    const purchaseDate = new Date(purchaseDateStr || new Date().toISOString().slice(0,10));
+    const kesim = card.kesimGunu || 1;
+    const purchaseDay = purchaseDate.getDate();
+    let firstMonth = purchaseDate.getMonth();
+    let firstYear = purchaseDate.getFullYear();
+    // Kesim günü geçmişse bir sonraki aya
+    if(purchaseDay >= kesim){ firstMonth++; if(firstMonth>11){firstMonth=0;firstYear++;} }
+    const installAmt = Math.round(amt / inst);
+    const exps = [];
+    for(let i=0; i<inst; i++){
+      let m = firstMonth+i; let y = firstYear;
+      while(m>11){m-=12;y++;}
+      const payDay = card.sonOdemeGunu || card.payDay || 1;
+      const dateStr = y+"-"+String(m+1).padStart(2,"0")+"-"+String(payDay).padStart(2,"0");
+      exps.push({
+        id: Date.now()+i,
+        category, icon, amount: installAmt,
+        date: dateStr, payMethod:"kredi_karti",
+        cardId: card.id, installments: inst,
+        installmentAmt, installmentNo: i+1,
+        totalInstallments: inst,
+        isInstallment: inst>1,
+        note: inst>1 ? `${i+1}/${inst}. taksit` : ""
+      });
+    }
+    return exps;
+  }
 
   function saveQuickExp(){
     if(!quickForm.amount||!quickForm.category)return;
@@ -713,28 +710,13 @@ function App(){
     const amt=Number(quickForm.amount);
     const installAmt=Math.round(amt/inst);
 
-    if(quickForm.payMethod==="kredi_karti"&&quickForm.cardId&&inst>1){
+    if(quickForm.payMethod==="kredi_karti"&&quickForm.cardId){
       const card=debts.find(d=>d.id===Number(quickForm.cardId));
-      const kesim=card?.kesimGunu||1;
-      const purchaseDay=today.getDate();
-      let firstMonth=today.getMonth();
-      let firstYear=today.getFullYear();
-      if(purchaseDay>kesim){firstMonth++;if(firstMonth>11){firstMonth=0;firstYear++;}}
-      const newExps=[];
-      for(let i=0;i<inst;i++){
-        let m=firstMonth+i; let y=firstYear;
-        while(m>11){m-=12;y++;}
-        const payDay=card?.sonOdemeGunu||card?.payDay||1;
-        const dateStr=y+"-"+String(m+1).padStart(2,"0")+"-"+String(payDay).padStart(2,"0");
-        newExps.push({id:Date.now()+i,category:quickForm.category,amount:installAmt,date:dateStr,
-          icon:catObj?.icon||"📌",payMethod:"kredi_karti",cardId:Number(quickForm.cardId),
-          installments:inst,installmentAmt:installAmt,installmentNo:i+1,totalInstallments:inst,
-          isInstallment:true,note:(i+1)+"/"+inst+". taksit"});
-      }
-      setDebts(p=>p.map(d=>d.id===Number(quickForm.cardId)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
+      if(!card) return;
+      const newExps=buildCardExpenses(card, quickForm.category, catObj?.icon||"📌", amt, inst, todayStr);
+      setDebts(p=>p.map(d=>d.id===card.id?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
       setExpenses(p=>[...p,...newExps]);
     } else if(quickForm.payMethod==="kmh"&&quickForm.kmhId){
-      // KMH harcaması: o borcun remaining'ini artır
       const newExp={id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
         icon:catObj?.icon||"📌",payMethod:"kmh",kmhId:Number(quickForm.kmhId),
         installments:1,installmentAmt:amt,note:quickForm.note||""};
@@ -745,9 +727,6 @@ function App(){
         icon:catObj?.icon||"📌",payMethod:quickForm.payMethod,
         cardId:quickForm.cardId?Number(quickForm.cardId):null,
         installments:1,installmentAmt:amt,note:quickForm.note||""};
-      if(quickForm.payMethod==="kredi_karti"&&quickForm.cardId){
-        setDebts(p=>p.map(d=>d.id===Number(quickForm.cardId)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
-      }
       setExpenses(p=>[...p,newExp]);
     }
     setQuickForm(prev=>({...prev,amount:"",note:"",installments:1}));
@@ -1763,10 +1742,7 @@ Türkçe, samimi, max 350 kelime.`;
                 <div>
                   <div style={{fontSize:14,fontWeight:800}}>{mg.label}</div>
                   <div style={{fontSize:10,color:"#888"}}>
-                    Gelir: {fmt(mg.income)}
-                    {mg.recurringCost>0&&<span style={{color:"#e67e22"}}> · Taksit: {fmt(mg.recurringCost)}</span>}
-                    · Yaşam: {fmt(mg.livingCost)}
-                    · Kalan: <span style={{color:mg.surplus>=0?"#27ae60":"#e74c3c",fontWeight:700}}>{fmt(mg.surplus)}</span>
+                    Gelir: {fmt(mg.income)} · Kira: {fmt(mg.livingCost)} · Kalan: <span style={{color:mg.surplus>=0?"#27ae60":"#e74c3c",fontWeight:700}}>{fmt(mg.surplus)}</span>
                   </div>
                 </div>
                 <div style={{textAlign:"right"}}>
@@ -1774,6 +1750,9 @@ Türkçe, samimi, max 350 kelime.`;
                   <div style={{fontSize:10,color:"#aaa"}}>toplam ödeme</div>
                 </div>
               </div>
+              {(mg.additions||[]).length>0&&<div style={{background:"#fff8e1",borderRadius:8,padding:"7px 10px",marginBottom:6,fontSize:11,color:"#f57f17"}}>
+                ⚠️ Bu ay kart borcuna eklendi: {(mg.additions||[]).map(a=>`${a.debtName} +${new Intl.NumberFormat("tr-TR").format(a.amount)}₺`).join(" · ")}
+              </div>}
               {mg.payments.map((p,pi)=>{
                 const icon=p.type==="kredi"?"🏦":p.type==="kmh"?"🏦":"💳";
                 const bg=p.type==="kredi"?"#e3f2fd":p.type==="kmh"?"#f3e8fd":"#fff8f0";
@@ -1947,7 +1926,7 @@ Türkçe, samimi, max 350 kelime.`;
         {/* Header */}
         <div style={{background:"linear-gradient(135deg,#1a1a2e,#c0392b)",borderRadius:"20px 20px 0 0",padding:"18px 20px",color:"#fff"}}>
           <div style={{fontSize:11,opacity:.7,marginBottom:4}}>Adım {wizardStep+1} / 6</div>
-          <div style={{fontSize:16,fontWeight:800}}>{["💰 Gelirler","💜 KMH Borçları","💳 Kredi Kartları","🏦 Sabit Krediler","🔄 Geçmiş Taksitler","✅ Özet & Onayla"][wizardStep]}</div>
+          <div style={{fontSize:16,fontWeight:800}}>{["💰 Gelirler","💜 KMH Borçları","💳 Kredi Kartları","🏦 Sabit Krediler","ℹ️ Bilgi","✅ Özet & Onayla"][wizardStep]}</div>
           <div style={{display:"flex",gap:4,marginTop:10}}>
             {[0,1,2,3,4,5].map(i=><div key={i} style={{flex:1,height:3,borderRadius:99,background:i<=wizardStep?"#fff":"rgba(255,255,255,.3)"}}/>)}
           </div>
@@ -2084,10 +2063,17 @@ Türkçe, samimi, max 350 kelime.`;
               style={{width:"100%",border:"1.5px dashed #a9cce3",borderRadius:10,padding:"10px",fontSize:12,color:"#2980b9",background:"none",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>+ Sabit Kredi Ekle</button>
           </div>}
 
-          {/* ADIM 4: GEÇMİŞ TAKSİTLER */}
+          {/* ADIM 4: GEÇMİŞ TAKSİTLER - artık gerekli değil */}
           {wizardStep===4&&<div>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Karta yansıyacak geçmiş taksitler</div>
-            <div style={{fontSize:11,color:"#888",marginBottom:12}}>Daha önce yaptığın taksitli alışverişlerin gelecek ay ekstresine yansıyacak tutarları</div>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:8}}>🔄 Geçmiş Taksitler</div>
+            <div style={{background:"#e8f5e9",borderRadius:12,padding:"14px",marginBottom:12}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#2e7d32",marginBottom:6}}>✅ Bu adıma gerek yok</div>
+              <div style={{fontSize:12,color:"#388e3c",lineHeight:1.6}}>
+                Geçmişte yaptığın taksitli alışverişler zaten kredi kartı borcuna dahil.<br/>
+                Ödeme planı kredi kartı borçlarını otomatik olarak hesaplıyor.<br/>
+                Ayrıca girmene gerek yok — çifte sayılır.
+              </div>
+            </div>
             {wizardData.recurring.map((r,i)=>(
               <div key={i} style={{background:"#f9f9f9",borderRadius:12,padding:"12px",marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:6}}>
