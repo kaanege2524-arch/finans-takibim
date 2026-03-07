@@ -320,6 +320,8 @@ function App(){
   const [showPurchase,setShowPurchase]=useState(false);
   const [showAddRecurring,setShowAddRecurring]=useState(false);
   const [showAddCat,setShowAddCat]=useState(false);
+  const [showDistribute,setShowDistribute]=useState(false);
+  const [distPays,setDistPays]=useState({});
   const [editRecurringId,setEditRecurringId]=useState(null);
 
   const blankDebt={name:"",type:"kredi",remaining:"",monthly:"",rate:"",months:"",payDay:"",userPayment:"",kesimGunu:"",sonOdemeGunu:""};
@@ -1000,23 +1002,20 @@ Türkçe, samimi, max 350 kelime.`;
             <div style={{fontSize:13,color:"#666"}}>Toplam: <strong style={{color:"#1a1a2e"}}>{fmt(totalDebt)}</strong></div>
             <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
               <button onClick={()=>{
-                // Tüm nakiti borçlara dağıt — her esnek borca %20 min, kalanı Avalanche
                 const flexD=debts.filter(d=>d.type!=="kredi");
                 const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
                 const expTotal=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
                 const available=Math.max(0,totalIncome-fixedTotal-expTotal);
                 if(available<=0){alert("Dağıtılacak gelir yok.");return;}
-                // Önce %20 min ata
                 let rem=available;
                 const newPays={};
                 const sorted=[...flexD].sort((a,b)=>b.rate-a.rate);
                 sorted.forEach(d=>{const min=Math.ceil(d.remaining*0.20);newPays[d.id]=min;rem-=min;});
-                // Kalanı Avalanche — en yüksek faize
                 for(let i=0;i<sorted.length&&rem>0;i++){
                   const add=Math.min(rem,sorted[i].remaining-newPays[sorted[i].id]);
                   if(add>0){newPays[sorted[i].id]+=Math.round(add);rem-=Math.round(add);}
                 }
-                setDebts(p=>p.map(d=>newPays[d.id]!==undefined?{...d,userPayment:newPays[d.id]}:d));
+                setDistPays(newPays);setShowDistribute(true);
               }} style={{...btnS("#27ae60"),width:"auto",padding:"7px 10px",fontSize:11}}>⚡ Nakiti Dağıt</button>
               <button onClick={()=>{setShowPurchase(true);}} style={{...btnS("#e67e22"),width:"auto",padding:"7px 10px",fontSize:11}}>🛒 Harcama</button>
               <button onClick={()=>{setEditDebtId(null);setDForm(blankDebt);setShowAddDebt(!showAddDebt);}} style={{...btnP,width:"auto",padding:"7px 11px",fontSize:11}}>+ Ekle</button>
@@ -1024,6 +1023,36 @@ Türkçe, samimi, max 350 kelime.`;
           </div>
 
           {/* Kart alışverişi modalı */}
+
+      {/* Nakiti Dağıt Önizleme Modalı */}
+      {showDistribute&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+        <div style={{background:"#fff",borderRadius:20,padding:20,width:"100%",maxWidth:440,maxHeight:"80vh",overflowY:"auto"}}>
+          <div style={{fontSize:16,fontWeight:800,marginBottom:4}}>⚡ Nakiti Dağıt</div>
+          <div style={{fontSize:12,color:"#888",marginBottom:16}}>Avalanche yöntemiyle hesaplandı. Tutarları değiştirebilirsin.</div>
+          {debts.filter(d=>d.type!=="kredi"&&distPays[d.id]!==undefined).map(d=>(
+            <div key={d.id} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+              <div style={{flex:1,fontSize:13,fontWeight:600}}>{d.name}</div>
+              <div style={{fontSize:10,color:"#888",minWidth:60}}>kalan: {fmt(d.remaining)}</div>
+              <input
+                type="number"
+                value={distPays[d.id]||0}
+                onChange={e=>setDistPays(p=>({...p,[d.id]:Number(e.target.value)}))}
+                style={{width:100,border:"1.5px solid #ddd",borderRadius:8,padding:"6px 8px",fontSize:13,textAlign:"right"}}
+              />
+            </div>
+          ))}
+          <div style={{borderTop:"1px solid #eee",paddingTop:10,marginTop:4,fontSize:12,color:"#666",marginBottom:14}}>
+            Toplam dağıtım: <strong style={{color:"#27ae60"}}>{fmt(Object.values(distPays).reduce((s,v)=>s+v,0))}</strong>
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{
+              setDebts(p=>p.map(d=>distPays[d.id]!==undefined?{...d,userPayment:distPays[d.id]}:d));
+              setShowDistribute(false);
+            }} style={{flex:1,background:"#27ae60",color:"#fff",border:"none",borderRadius:10,padding:"12px",fontSize:14,fontWeight:700,cursor:"pointer"}}>✅ Uygula</button>
+            <button onClick={()=>setShowDistribute(false)} style={{flex:1,background:"#eee",color:"#555",border:"none",borderRadius:10,padding:"12px",fontSize:14,fontWeight:600,cursor:"pointer"}}>İptal</button>
+          </div>
+        </div>
+      </div>}
           {showPurchase&&<Card style={{border:"2px dashed #e67e22"}}>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#e67e22"}}>🛒 Kart ile Alışveriş</div>
             <div style={{fontSize:11,color:"#888",marginBottom:10}}>Tutar kart borcuna eklenecek, gider olarak kaydedilecek</div>
