@@ -861,9 +861,7 @@ Türkçe, samimi, max 350 kelime.`;
         <Tab label="💰 Gelirler" active={tab==="gelirler"} onClick={()=>setTab("gelirler")}/>
         <Tab label="💳 Borçlar"  active={tab==="borclar"}  onClick={()=>setTab("borclar")} badge={debts.length}/>
         <Tab label="💸 Giderler" active={tab==="giderler"} onClick={()=>setTab("giderler")}/>
-        <Tab label="💡 Öneri"    active={tab==="oneri"}    onClick={()=>setTab("oneri")}/>
         <Tab label="📅 Plan"     active={tab==="plan"}     onClick={()=>setTab("plan")}/>
-        <Tab label="📋 Rapor"    active={tab==="rapor"}    onClick={()=>setTab("rapor")}/>
         <Tab label="🤖 AI"       active={tab==="ai"}       onClick={()=>setTab("ai")}/>
       </div>
 
@@ -1491,53 +1489,70 @@ Türkçe, samimi, max 350 kelime.`;
           <button onClick={exportExcel} style={{...btnS("#27ae60"),marginTop:4}}>📊 Giderleri Excel'e Aktar</button>
         </>}
 
-        {/* ══ ÖDEME ÖNERİSİ ════════════════════════════════════════════════ */}
-        {tab==="oneri"&&<>
-          <Card style={{background:"linear-gradient(135deg,#c0392b,#922b21)",color:"#fff",padding:"18px 16px"}}>
-            <div style={{fontSize:22,marginBottom:6}}>🧠</div>
-            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Gelire Göre Akıllı Ödeme Önerisi</div>
-            <div style={{fontSize:11,opacity:.8,lineHeight:1.7,marginBottom:12}}>Maaş ve ek gelirler hesaba katılarak kalan bütçe <strong>Avalanche yöntemiyle</strong> dağıtıldı.</div>
-            <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-              {[["Toplam Gelir",fmt(totalIncome)],["Sabit Krediler",fmt(smart.fixedTotal)],["Yaşam Gideri",fmt(smart.living)],["Dağıtılabilir",fmt(smart.available)]].map(([l,v])=>(
-                <div key={l} style={{background:"rgba(255,255,255,.15)",borderRadius:10,padding:"7px 10px",flex:"1 1 calc(50% - 4px)"}}>
-                  <div style={{fontSize:9,opacity:.75}}>{l}</div><div style={{fontSize:13,fontWeight:800}}>{v}</div>
-                </div>
-              ))}
-            </div>
+        {tab==="plan"&&<>
+          {/* ── Senaryo Karşılaştırma ── */}
+          <Card style={{background:"linear-gradient(135deg,#1a1a2e,#2c3e50)",color:"#fff",padding:"14px 16px"}}> 
+            <div style={{fontSize:15,fontWeight:800,marginBottom:4}}>📅 Ödeme Planı & Senaryo Karşılaştırma</div>
+            <div style={{fontSize:11,opacity:.75}}>Farklı stratejileri karşılaştır, en iyisini uygula.</div>
           </Card>
-          {smart.payments.map((p,i)=>{
-            const pri=i===0;
-            return <Card key={p.id} style={{border:pri?"2px solid #c0392b":"1px solid #f0f0f0"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <div style={{width:24,height:24,borderRadius:"50%",background:pri?"#c0392b":"#ddd",color:pri?"#fff":"#888",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800}}>{i+1}</div>
-                <div style={{flex:1}}><div style={{fontSize:13,fontWeight:700}}>{p.name}</div><TBadge type={p.type}/><span style={{marginLeft:5,fontSize:10,color:"#888"}}>%{p.rate} · {fmt(p.remaining)}</span></div>
-                {pri&&<span style={{fontSize:9,background:"#fdf0f0",color:"#c0392b",borderRadius:20,padding:"2px 7px",fontWeight:700}}>ÖNCELİKLİ</span>}
-              </div>
-              <div style={{background:pri?"#fdf0f0":"#f8f9fa",borderRadius:12,padding:"12px 14px",marginBottom:10}}>
-                <div style={{fontSize:11,color:"#888",marginBottom:2}}>Önerilen aylık ödeme</div>
-                <div style={{fontSize:26,fontWeight:800,color:pri?"#c0392b":"#1a1a2e"}}>{fmt(p.suggested)}</div>
-                <div style={{fontSize:10,color:"#aaa"}}>Min: {fmt(p.minPay)} · +{fmt(p.suggested-p.minPay)} fazla</div>
-              </div>
-              <div style={{display:"flex",gap:6}}>
-                {[["Bitiş",`${p.finishMonths} ay`,"#2e7d32","#e8f5e9"],["Toplam Faiz",fmt(p.totalInterest),"#e65100","#fff8e1"],["Kazanç",fmt(p.savedVsMin),"#1565c0","#e3f2fd"]].map(([l,v,c,bg])=>(
-                  <div key={l} style={{flex:1,background:bg,borderRadius:10,padding:"8px",textAlign:"center"}}>
-                    <div style={{fontSize:9,color:"#555",marginBottom:2}}>{l}</div>
-                    <div style={{fontSize:12,fontWeight:700,color:c}}>{v}</div>
+
+          {(()=>{
+            const flexD=debts.filter(d=>d.type!=="kredi");
+            const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
+            const expTotal=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
+            const available=Math.max(0,totalIncome-fixedTotal-expTotal);
+
+            // Senaryo hesapla
+            function calcScenario(sortedDebts, available){
+              let rem=available;
+              const pays={};
+              sortedDebts.forEach(d=>{const min=Math.ceil(d.remaining*0.20);pays[d.id]=min;rem-=min;});
+              for(let i=0;i<sortedDebts.length&&rem>0;i++){
+                const add=Math.min(rem,sortedDebts[i].remaining-pays[sortedDebts[i].id]);
+                if(add>0){pays[sortedDebts[i].id]+=Math.round(add);rem-=Math.round(add);}
+              }
+              // Toplam faiz ve süre
+              let maxMonths=0; let totalInterest=0;
+              sortedDebts.forEach(d=>{
+                const pl=buildFlexPlan({...d,userPayment:pays[d.id]||d.monthly});
+                maxMonths=Math.max(maxMonths,pl.length);
+                totalInterest+=pl.reduce((s,r)=>s+(r.interest||0),0);
+              });
+              return {pays,maxMonths,totalInterest};
+            }
+
+            const minPays={}; flexD.forEach(d=>{minPays[d.id]=Math.ceil(d.remaining*0.20);});
+            let minMaxM=0,minTotI=0;
+            flexD.forEach(d=>{const pl=buildFlexPlan({...d,userPayment:minPays[d.id]||d.monthly});minMaxM=Math.max(minMaxM,pl.length);minTotI+=pl.reduce((s,r)=>s+(r.interest||0),0);});
+
+            const avalanche=calcScenario([...flexD].sort((a,b)=>b.rate-a.rate), available);
+            const snowball=calcScenario([...flexD].sort((a,b)=>a.remaining-b.remaining), available);
+
+            const scenarios=[
+              {label:"Minimum",emoji:"🐢",color:"#e74c3c",bg:"#fff5f5",pays:minPays,months:minMaxM,interest:minTotI,desc:"Sadece %20 minimum öde"},
+              {label:"Avalanche",emoji:"🏔",color:"#2980b9",bg:"#f0f8ff",pays:avalanche.pays,months:avalanche.maxMonths,interest:avalanche.totalInterest,desc:"Yüksek faizi önce bitir"},
+              {label:"Snowball",emoji:"⛄",color:"#8e44ad",bg:"#f9f0ff",pays:snowball.pays,months:snowball.maxMonths,interest:snowball.totalInterest,desc:"Küçük borcu önce bitir"},
+            ];
+
+            return <div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
+                {scenarios.map(s=>(
+                  <div key={s.label} style={{background:s.bg,border:`2px solid ${s.color}33`,borderRadius:14,padding:"10px 8px",textAlign:"center"}}>
+                    <div style={{fontSize:20,marginBottom:4}}>{s.emoji}</div>
+                    <div style={{fontSize:11,fontWeight:800,color:s.color,marginBottom:2}}>{s.label}</div>
+                    <div style={{fontSize:9,color:"#888",marginBottom:6}}>{s.desc}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:"#1a1a2e",marginBottom:1}}>{s.months} ay</div>
+                    <div style={{fontSize:10,color:"#e67e22",marginBottom:8}}>Faiz: {fmt(Math.round(s.interest))}</div>
+                    <button onClick={()=>{setDistPays(s.pays);setShowDistribute(true);}} style={{background:s.color,color:"#fff",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:700,cursor:"pointer",width:"100%"}}>Uygula</button>
                   </div>
                 ))}
               </div>
-            </Card>;
-          })}
-          {smart.surplus>0&&<Card style={{background:"#f0fff4",border:"1px solid #b2dfdb"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#1b5e20",marginBottom:4}}>🎉 Aylık {fmt(smart.surplus)} artıyor</div>
-            <div style={{fontSize:12,color:"#388e3c",lineHeight:1.6}}>Tüm ödemeler sonrası kalan para. Acil fon veya ekstra ödeme için kullanabilirsin.</div>
-          </Card>}
-          <button onClick={applySmart} style={{...btnP,fontSize:15,padding:"15px",marginBottom:6}}>✅ Bu Tutarları Ödeme Planıma Uygula</button>
-          <div style={{fontSize:11,color:"#aaa",textAlign:"center",marginBottom:12}}>Borçlar sekmesinden istediğin zaman değiştirebilirsin</div>
-        </>}
+              <div style={{fontSize:11,color:"#888",textAlign:"center",marginBottom:12}}>
+                💡 Avalanche ile Minimum'a göre <strong style={{color:"#27ae60"}}>{fmt(Math.round(minTotI-avalanche.totalInterest))} faiz tasarrufu</strong>
+              </div>
+            </div>;
+          })()}
 
-        {/* ══ ÖDEME PLANI ══════════════════════════════════════════════════ */}
-        {tab==="plan"&&<>
           {suggApplied&&<Card style={{background:"#e8f5e9",border:"1px solid #c8e6c9",padding:"10px 14px",marginBottom:12}}>
             <div style={{fontSize:12,color:"#2e7d32",fontWeight:600}}>✅ Akıllı öneri tutarları uygulandı!</div>
           </Card>}
@@ -1630,64 +1645,6 @@ Türkçe, samimi, max 350 kelime.`;
           <button onClick={exportExcel} style={btnS("#27ae60")}>📊 Ödeme Planını Excel'e Aktar</button>
         </>}
 
-        {/* ══ AYLIK RAPOR ══════════════════════════════════════════════════ */}
-        {tab==="rapor"&&<>
-          <Card style={{background:"linear-gradient(135deg,#1a237e,#283593)",color:"#fff",padding:"18px 16px"}}>
-            <div style={{fontSize:22,marginBottom:6}}>📋</div>
-            <div style={{fontSize:16,fontWeight:800,marginBottom:6}}>Aylık Finansal Rapor</div>
-            <div style={{fontSize:11,opacity:.8,lineHeight:1.7,marginBottom:14}}>Bir önceki aya ait tüm veriler AI tarafından analiz edilir.</div>
-            <button onClick={getMonthlyReport} disabled={reportLoading} style={{...btnP,background:"#3949ab",opacity:reportLoading?.7:1,fontSize:14,padding:"13px"}}>
-              {reportLoading?"⏳ Rapor hazırlanıyor...":"📊 Aylık Raporu Oluştur"}
-            </button>
-          </Card>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            {[[`💰 ${fmt(totalIncome)}`,"Gelir","#27ae60","#f0fff4"],[`💸 ${fmt(totalMonthly)}`,"Borç Öd.","#e67e22","#fff8f0"],[`🧾 ${fmt(totalExpenses)}`,"Gider","#e74c3c","#fff5f5"],[`✅ ${fmt(freeIncome)}`,"Net Kalan",freeIncome>=0?"#27ae60":"#e74c3c",freeIncome>=0?"#f0fff4":"#fff5f5"]].map(([v,l,c,bg])=>(
-              <div key={l} style={{background:bg,borderRadius:14,padding:"12px 13px",border:`1px solid ${c}22`}}>
-                <div style={{fontSize:10,color:"#888",marginBottom:4}}>{l}</div>
-                <div style={{fontSize:14,fontWeight:800,color:c}}>{v}</div>
-              </div>
-            ))}
-          </div>
-          {activeRecurring.length>0&&<Card style={{background:"#f9f0ff",border:"1px solid #d7bef5"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#8e44ad",marginBottom:10}}>🔄 Sabit Giderler</div>
-            {activeRecurring.map(r=>{
-              const elapsed=new Date().getFullYear()*12+new Date().getMonth()-(new Date(r.startDate).getFullYear()*12+new Date(r.startDate).getMonth())+1;
-              const remaining=r.totalMonths-elapsed+1;
-              return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid #e8d5f5"}}>
-                <div>
-                  <div style={{fontSize:12,fontWeight:600}}>{r.icon} {r.category}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>{elapsed}/{r.totalMonths} ay · {remaining} ay kaldı</div>
-                  <div style={{background:"#e8d5f5",borderRadius:99,height:4,width:100,marginTop:3,overflow:"hidden"}}>
-                    <div style={{width:`${Math.min(100,(elapsed/r.totalMonths)*100)}%`,height:"100%",background:"#8e44ad",borderRadius:99}}/>
-                  </div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(r.amount)}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>Kalan: {fmt(r.amount*remaining)}</div>
-                </div>
-              </div>;
-            })}
-          </Card>}
-          {reportLoading&&<Card><div className="pulse" style={{textAlign:"center",padding:"24px",color:"#888",fontSize:13}}>
-            <div style={{fontSize:32,marginBottom:8}}>📊</div>Rapor hazırlanıyor...
-          </div></Card>}
-          {monthlyReport&&<Card style={{border:"2px solid #c5cae9"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#1a237e"}}>📋 Aylık Rapor</div>
-              <button onClick={()=>{const el=document.createElement('a');el.href='data:text/plain;charset=utf-8,'+encodeURIComponent(monthlyReport);el.download=`Rapor_${curMonth}.txt`;el.click();}} style={{fontSize:11,background:"#e8eaf6",color:"#3949ab",border:"none",borderRadius:8,padding:"5px 10px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>💾 İndir</button>
-            </div>
-            <div style={{fontSize:13,lineHeight:1.9,color:"#333",whiteSpace:"pre-wrap"}}>{monthlyReport}</div>
-          </Card>}
-          {!monthlyReport&&!reportLoading&&<Card style={{background:"#f8f9ff",border:"1px solid #c5cae9"}}>
-            <div style={{fontSize:13,fontWeight:700,color:"#3949ab",marginBottom:8}}>💡 Rapor Neler İçerir?</div>
-            {["Geçen aya ait gelir-gider analizi","En yüksek harcama kalemleri","Borç ödeme durumu değerlendirmesi","Dikkat edilmesi gereken noktalar","Gelecek ay için somut öneriler"].map((t,i)=>(
-              <div key={i} style={{fontSize:12,color:"#555",padding:"5px 0",display:"flex",gap:8,borderBottom:"1px solid #e8eaf6"}}>
-                <span style={{color:"#3949ab"}}>✓</span><span>{t}</span>
-              </div>
-            ))}
-          </Card>}
-        </>}
-
         {/* ══ AI SOHBET ════════════════════════════════════════════════════ */}
         {tab==="ai"&&<>
           <Card style={{background:"linear-gradient(135deg,#1a1a2e,#16213e)",color:"#fff",padding:"14px 16px",marginBottom:8}}>
@@ -1705,11 +1662,34 @@ Türkçe, samimi, max 350 kelime.`;
               {chatMessages.length>0&&<button onClick={()=>setChatMessages([])} style={{background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>🗑 Temizle</button>}
             </div>
           </Card>
+          {(()=>{
+            // Proaktif uyarılar — kesim tarihi yakın kartlar
+            const today=new Date().getDate();
+            const alerts=debts.filter(d=>{
+              const payD=d.sonOdemeGunu||d.payDay;
+              if(!payD) return false;
+              const diff=payD-today;
+              return diff>=0&&diff<=7;
+            });
+            return alerts.length>0&&<div style={{marginBottom:10}}>
+              {alerts.map(d=>{
+                const payD=d.sonOdemeGunu||d.payDay;
+                const diff=payD-today;
+                return <div key={d.id} style={{background:diff<=3?"#fff0f0":"#fffbf0",border:`1.5px solid ${diff<=3?"#e74c3c":"#f39c12"}`,borderRadius:12,padding:"10px 13px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:12,fontWeight:700,color:diff<=3?"#c0392b":"#e67e22"}}>{diff<=3?"🚨":"⚡"} {d.name}</div>
+                    <div style={{fontSize:11,color:"#888"}}>{diff===0?"Bugün son gün!":diff===1?"Yarın son gün!":`${diff} gün kaldı`} · {fmt(d.userPayment||d.monthly)}</div>
+                  </div>
+                  <button onClick={()=>{setChatInput(`${d.name} için ${diff} gün içinde ${fmt(d.userPayment||d.monthly)} ödeme yapmam gerekiyor. Bu konuda ne önerirsin?`);setTimeout(()=>chatInputRef.current?.focus(),50);}} style={{background:diff<=3?"#c0392b":"#e67e22",color:"#fff",border:"none",borderRadius:8,padding:"5px 9px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>AI'a Sor</button>
+                </div>;
+              })}
+            </div>;
+          })()}
           {chatMessages.length===0&&<div style={{marginBottom:10}}>
             <div style={{fontSize:11,color:"#888",marginBottom:8}}>💡 Hızlı sorular:</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {["Hangi borcumu önce kapatmalıyım?","Bu ay ne kadar tasarruf edebilirim?","Finansal durumumu değerlendirir misin?","Aylık bütçe nasıl ayarlamalıyım?","KMH'larımı kapatmak ne kadar sürer?","Avalanche yöntemiyle ödeme planı yap"].map((q,i)=>(
-                <button key={i} onClick={()=>{setChatInput(q);setTimeout(()=>chatInputRef.current?.focus(),50);}}
+              {["Hangi borcumu önce kapatmalıyım?","Bu ay ne kadar tasarruf edebilirim?","Finansal durumumu değerlendirir misin?","Borç/gelir oranım sağlıklı mı?","KMH'larımı kapatmak ne kadar sürer?","Bu ay ödeme öncelik sırası ne olmalı?"].map((q,i)=>(
+                <button key={i} onClick={()=>{setChatInput(q);setTimeout(()=>{chatInputRef.current?.focus();},50);}}
                   style={{background:"#fff",border:"1.5px solid #e0e0e0",borderRadius:20,padding:"6px 12px",fontSize:11,color:"#444",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
                   {q}
                 </button>
@@ -1759,6 +1739,23 @@ Türkçe, samimi, max 350 kelime.`;
               </div>
             ))}
           </div>
+
+          {/* Aylık AI Raporu */}
+          <Card style={{marginTop:10,border:"1.5px solid #c5cae9",background:"#f8f9ff"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#1a237e",marginBottom:6}}>📋 Aylık AI Raporu</div>
+            <div style={{fontSize:11,color:"#888",marginBottom:10}}>Tüm verilerini AI analiz eder, özet rapor çıkarır.</div>
+            <button onClick={getMonthlyReport} disabled={reportLoading} style={{...btnP,background:"#3949ab",opacity:reportLoading?.7:1,fontSize:13,padding:"11px",marginBottom:0}}>
+              {reportLoading?"⏳ Rapor hazırlanıyor...":"📊 Aylık Raporu Oluştur"}
+            </button>
+            {reportLoading&&<div className="pulse" style={{textAlign:"center",padding:"16px",color:"#888",fontSize:12,marginTop:8}}>Rapor hazırlanıyor...</div>}
+            {monthlyReport&&<div style={{marginTop:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{fontSize:12,fontWeight:700,color:"#1a237e"}}>📋 Rapor Hazır</div>
+                <button onClick={()=>{const el=document.createElement("a");el.href="data:text/plain;charset=utf-8,"+encodeURIComponent(monthlyReport);el.download=`Rapor_${curMonth}.txt`;el.click();}} style={{fontSize:10,background:"#e8eaf6",color:"#3949ab",border:"none",borderRadius:8,padding:"4px 9px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>💾 İndir</button>
+              </div>
+              <div style={{fontSize:12,lineHeight:1.9,color:"#333",whiteSpace:"pre-wrap",background:"#fff",borderRadius:10,padding:12}}>{monthlyReport}</div>
+            </div>}
+          </Card>
         </>}
 
 
