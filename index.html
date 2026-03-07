@@ -598,9 +598,9 @@ ${activeRecurring.length>0?`Sabit Giderler: ${activeRecurring.map(r=>`${r.catego
     setTimeout(()=>chatEndRef.current?.scrollIntoView({behavior:"smooth"}),100);
     const systemPrompt=`Sen samimi, yardımsever bir Türk kişisel finans danışmanısın. Kullanıcının finansal verilerine erişimin var. Kısa, net, uygulanabilir öneriler ver. Türkçe konuş.\n\n${buildFinContext()}`;
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{
+      const r=await fetch("https://finans-proxy.kaanege2524.workers.dev",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:800,system:systemPrompt,messages:newMessages.map(m=>({role:m.role,content:m.content}))})
       });
       const d=await r.json();
@@ -643,9 +643,9 @@ Raporda şunları yaz:
 
 Türkçe, samimi, max 350 kelime.`;
     try{
-      const r=await fetch("https://api.anthropic.com/v1/messages",{
+      const r=await fetch("https://finans-proxy.kaanege2524.workers.dev",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":API_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1000,messages:[{role:"user",content:prompt}]})
       });
       const d=await r.json();setMonthlyReport(d.content?.[0]?.text||"Yanıt alınamadı.");
