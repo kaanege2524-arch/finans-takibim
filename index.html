@@ -129,8 +129,17 @@ const BASE_CATS=[
 ];
 
 const initRecurring=[
-  {id:1,category:"Akbank K.Kartı - Nisan Taksiti",icon:"💳",amount:5700,dayOfMonth:18,startDate:"2026-04-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
-  {id:2,category:"Akbank K.Kartı - Mayıs Taksiti",icon:"💳",amount:2400,dayOfMonth:18,startDate:"2026-05-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
+  // Akbank K.Kartı geçmiş taksitler
+  {id:1, category:"Akbank K.Kartı - Nisan Taksiti",  icon:"💳",amount:5700,dayOfMonth:18,startDate:"2026-04-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
+  {id:2, category:"Akbank K.Kartı - Mayıs Taksiti",  icon:"💳",amount:2400,dayOfMonth:18,startDate:"2026-05-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
+  {id:3, category:"Akbank K.Kartı - Haziran Taksiti",icon:"💳",amount:2400,dayOfMonth:18,startDate:"2026-06-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
+  {id:4, category:"Akbank K.Kartı - Temmuz Taksiti", icon:"💳",amount:770, dayOfMonth:18,startDate:"2026-07-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
+  {id:5, category:"Akbank K.Kartı - Ağustos Taksiti",icon:"💳",amount:770, dayOfMonth:18,startDate:"2026-08-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
+  {id:6, category:"Akbank K.Kartı - Eylül Taksiti",  icon:"💳",amount:770, dayOfMonth:18,startDate:"2026-09-01",totalMonths:1,payMethod:"kredi_karti",cardId:6,note:"Geçmiş taksitli alışveriş"},
+  // Garanti K.Kartı geçmiş taksitler
+  {id:7, category:"Garanti K.Kartı - Nisan Taksiti",  icon:"💳",amount:5160,dayOfMonth:23,startDate:"2026-04-01",totalMonths:1,payMethod:"kredi_karti",cardId:8,note:"Geçmiş taksitli alışveriş"},
+  {id:8, category:"Garanti K.Kartı - Mayıs Taksiti",  icon:"💳",amount:4410,dayOfMonth:23,startDate:"2026-05-01",totalMonths:1,payMethod:"kredi_karti",cardId:8,note:"Geçmiş taksitli alışveriş"},
+  {id:9, category:"Garanti K.Kartı - Haziran Taksiti",icon:"💳",amount:1460,dayOfMonth:23,startDate:"2026-06-01",totalMonths:1,payMethod:"kredi_karti",cardId:8,note:"Geçmiş taksitli alışveriş"},
 ];
 
 const ICONS=["🏠","🚗","📱","💈","🎓","🏋️","🐾","💊","🔌","🌐","🎵","📦","🍼","🧹","💰","📌"];
@@ -398,6 +407,7 @@ function App(){
 
   const [showFullPlan,setShowFullPlan]=useState(false);
   const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
+  const [planLiving,setPlanLiving]=useState(0); // 0 = estLiving kullan
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
@@ -534,10 +544,10 @@ function App(){
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
   const cascadePlans=useMemo(()=>({
-    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", estLiving),
-    snowball:  buildCascadePlan(debts, salary, incomes, "snowball", estLiving),
-    minimum:   buildCascadePlan(debts, salary, incomes, "minimum", estLiving),
-  }),[debts,salary,incomes,estLiving]);
+    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", planLiving||estLiving),
+    snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  planLiving||estLiving),
+    minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   planLiving||estLiving),
+  }),[debts,salary,incomes,estLiving,planLiving]);
 
   const scenarios=useMemo(()=>{
     function planSummary(plan){
@@ -1644,6 +1654,19 @@ Türkçe, samimi, max 350 kelime.`;
                 <div style={{textAlign:"right"}}><div style={{fontSize:13,fontWeight:800,color:"#2980b9"}}>{fmt(d.monthly)}</div><div style={{fontSize:10,color:"#aaa"}}>sabit</div></div>
               </div>
             ))}
+          </Card>
+          {/* Yaşam gideri ayarı */}
+          <Card style={{padding:"10px 14px",marginBottom:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>🏠 Aylık Yaşam Gideri</div>
+                <div style={{fontSize:10,color:"#888"}}>Borç ödemesi dışı sabit yaşam maliyetin</div>
+              </div>
+              <input type="number" value={planLiving||estLiving} onChange={e=>setPlanLiving(Number(e.target.value))}
+                style={{width:110,border:"1.5px solid #ddd",borderRadius:8,padding:"6px 8px",fontSize:13,textAlign:"right",fontFamily:"'Sora',sans-serif"}}/>
+              <span style={{fontSize:11,color:"#888"}}>₺</span>
+              {planLiving>0&&<button onClick={()=>setPlanLiving(0)} style={{fontSize:10,color:"#888",background:"none",border:"none",cursor:"pointer"}}>↩</button>}
+            </div>
           </Card>
           {/* Strateji seçici */}
           <div style={{display:"flex",gap:6,marginBottom:12}}>
