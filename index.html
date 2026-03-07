@@ -442,6 +442,7 @@ function App(){
   function startEdit(debt){
     setDForm({name:debt.name,type:debt.type,remaining:debt.remaining,monthly:debt.monthly,rate:debt.rate,months:debt.months||"",payDay:debt.payDay||"",userPayment:debt.userPayment||"",kesimGunu:debt.kesimGunu||"",sonOdemeGunu:debt.sonOdemeGunu||""});
     setEditDebtId(debt.id);setShowAddDebt(true);
+    setTimeout(()=>window.scrollTo({top:0,behavior:"smooth"}),50);
   }
   function deleteDebt(id){if(window.confirm("Bu borcu silmek istiyor musun?"))setDebts(p=>p.filter(d=>d.id!==id));}
 
