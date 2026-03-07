@@ -315,7 +315,11 @@ const Card=React.forwardRef(function Card({children,style={}},ref){
   return <div ref={ref} style={{background:"#fff",borderRadius:16,padding:"16px 14px",boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:12,...style}}>{children}</div>;
 })
 function TBadge({type}){
-  const m={kredi:["#e8f4fd","#2980b9","Kredi"],kredi_karti:["#fdf3e8","#e67e22","K.Kartı"],kmh:["#f3e8fd","#8e44ad","KMH"]};
+  const m={
+    kredi:     ["#e8f4fd","#2980b9","🏦 Kredi"],
+    kredi_karti:["#fdf3e8","#e67e22","💳 KK"],
+    kmh:       ["#f3e8fd","#8e44ad","🏦 KMH"],
+  };
   const [bg,c,l]=m[type]||["#eee","#555",type];
   return <span style={{background:bg,color:c,borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:600}}>{l}</span>;
 }
@@ -426,7 +430,7 @@ function App(){
   const [showAddExp,setShowAddExp]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState(new Date().toISOString().slice(0,7));
   const [showQuickExp,setShowQuickExp]=useState(false);
-  const [quickForm,setQuickForm]=useState({category:"Market",amount:"",payMethod:"kredi_karti",cardId:"",installments:1,note:""});
+  const [quickForm,setQuickForm]=useState({category:"Market",amount:"",payMethod:"kredi_karti",cardId:"",installments:1,note:"",kmhId:""});
   const [showAddIncome,setShowAddIncome]=useState(false);
   const [showPurchase,setShowPurchase]=useState(false);
   const [showAddRecurring,setShowAddRecurring]=useState(false);
@@ -446,7 +450,7 @@ function App(){
   const blankDebt={name:"",type:"kredi",remaining:"",monthly:"",rate:"",months:"",payDay:"",userPayment:"",kesimGunu:"",sonOdemeGunu:""};
   const [dForm,setDForm]=useState(blankDebt);
 
-  const blankExp={category:"Market",amount:"",date:new Date().toISOString().slice(0,10),payMethod:"nakit",cardId:"",installments:1};
+  const blankExp={category:"Market",amount:"",date:new Date().toISOString().slice(0,10),payMethod:"nakit",cardId:"",installments:1,kmhId:""};
   const [eForm,setEForm]=useState(blankExp);
   const [editExpId,setEditExpId]=useState(null);
 
@@ -700,6 +704,13 @@ function App(){
       }
       setDebts(p=>p.map(d=>d.id===Number(quickForm.cardId)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
       setExpenses(p=>[...p,...newExps]);
+    } else if(quickForm.payMethod==="kmh"&&quickForm.kmhId){
+      // KMH harcaması: o borcun remaining'ini artır
+      const newExp={id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
+        icon:catObj?.icon||"📌",payMethod:"kmh",kmhId:Number(quickForm.kmhId),
+        installments:1,installmentAmt:amt,note:quickForm.note||""};
+      setDebts(p=>p.map(d=>d.id===Number(quickForm.kmhId)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
+      setExpenses(p=>[...p,newExp]);
     } else {
       const newExp={id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
         icon:catObj?.icon||"📌",payMethod:quickForm.payMethod,
@@ -927,14 +938,26 @@ Türkçe, samimi, max 350 kelime.`;
             {/* Ödeme yöntemi */}
             <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>Ödeme Yöntemi</div>
             <div style={{display:"flex",gap:6,marginBottom:10}}>
-              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setQuickForm({...quickForm,payMethod:v,cardId:""})}
+              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"],["kmh","🏦 KMH"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setQuickForm({...quickForm,payMethod:v,cardId:"",kmhId:""})}
                   style={{flex:1,padding:"10px",border:`2px solid ${quickForm.payMethod===v?"#c0392b":"#e0e0e0"}`,borderRadius:12,background:quickForm.payMethod===v?"#fdf0f0":"#fff",color:quickForm.payMethod===v?"#c0392b":"#555",fontSize:13,fontWeight:700,cursor:"pointer"}}>
                   {l}
                 </button>
               ))}
             </div>
 
+            {/* KMH seçimi */}
+            {quickForm.payMethod==="kmh"&&<>
+              <div style={{fontSize:11,color:"#888",marginBottom:4,fontWeight:600}}>Hangi KMH?</div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>
+                {debts.filter(d=>d.type==="kmh").map(d=>(
+                  <button key={d.id} onClick={()=>setQuickForm({...quickForm,kmhId:String(d.id)})}
+                    style={{padding:"7px 12px",border:`2px solid ${quickForm.kmhId===String(d.id)?"#8e44ad":"#e0e0e0"}`,borderRadius:20,background:quickForm.kmhId===String(d.id)?"#f3e8fd":"#fff",color:quickForm.kmhId===String(d.id)?"#8e44ad":"#555",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
+                    🏦 {d.name}
+                  </button>
+                ))}
+              </div>
+            </>}
             {/* Kart seçimi */}
             {quickForm.payMethod==="kredi_karti"&&<>
               <div style={{fontSize:11,color:"#888",marginBottom:4,fontWeight:600}}>Hangi Kart?</div>
@@ -1462,13 +1485,17 @@ Türkçe, samimi, max 350 kelime.`;
 
             <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>💳 Ödeme Yöntemi</div>
             <div style={{display:"flex",gap:6,marginBottom:8}}>
-              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setRForm({...rForm,payMethod:v,cardId:""})} style={{flex:1,padding:"7px",border:`2px solid ${rForm.payMethod===v?"#8e44ad":"#e0e0e0"}`,borderRadius:10,background:rForm.payMethod===v?"#f3e8fd":"#fff",color:rForm.payMethod===v?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>{l}</button>
+              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"],["kmh","🏦 KMH"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setRForm({...rForm,payMethod:v,cardId:"",kmhId:""})} style={{flex:1,padding:"7px",border:`2px solid ${rForm.payMethod===v?"#8e44ad":"#e0e0e0"}`,borderRadius:10,background:rForm.payMethod===v?"#f3e8fd":"#fff",color:rForm.payMethod===v?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>{l}</button>
               ))}
             </div>
             {rForm.payMethod==="kredi_karti"&&<select style={inp} value={rForm.cardId} onChange={e=>setRForm({...rForm,cardId:e.target.value})}>
               <option value="">Kart seç...</option>
               {creditCards.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>}
+            {rForm.payMethod==="kmh"&&<select style={inp} value={rForm.kmhId||""} onChange={e=>setRForm({...rForm,kmhId:e.target.value})}>
+              <option value="">KMH seç...</option>
+              {debts.filter(d=>d.type==="kmh").map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
             </select>}
 
             <div style={{display:"flex",gap:8}}>
@@ -1520,12 +1547,20 @@ Türkçe, samimi, max 350 kelime.`;
             {/* Ödeme yöntemi */}
             <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>💳 Ödeme Yöntemi</div>
             <div style={{display:"flex",gap:6,marginBottom:8}}>
-              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setEForm({...eForm,payMethod:v,cardId:"",installments:1})} style={{flex:1,padding:"8px",border:`2px solid ${eForm.payMethod===v?"#c0392b":"#e0e0e0"}`,borderRadius:10,background:eForm.payMethod===v?"#fdf0f0":"#fff",color:eForm.payMethod===v?"#c0392b":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"],["kmh","🏦 KMH"]].map(([v,l])=>(
+                <button key={v} onClick={()=>setEForm({...eForm,payMethod:v,cardId:"",kmhId:"",installments:1})} style={{flex:1,padding:"8px",border:`2px solid ${eForm.payMethod===v?"#c0392b":"#e0e0e0"}`,borderRadius:10,background:eForm.payMethod===v?"#fdf0f0":"#fff",color:eForm.payMethod===v?"#c0392b":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
                   {l}
                 </button>
               ))}
             </div>
+
+            {eForm.payMethod==="kmh"&&<>
+              <div style={{fontSize:11,color:"#888",marginBottom:4,fontWeight:600}}>Hangi KMH?</div>
+              <select style={inp} value={eForm.kmhId||""} onChange={e=>setEForm({...eForm,kmhId:e.target.value})}>
+                <option value="">KMH seç...</option>
+                {debts.filter(d=>d.type==="kmh").map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </>}
 
             {eForm.payMethod==="kredi_karti"&&<>
               <select style={inp} value={eForm.cardId} onChange={e=>setEForm({...eForm,cardId:e.target.value})}>
@@ -2011,11 +2046,20 @@ Türkçe, samimi, max 350 kelime.`;
             <div style={{fontSize:11,color:"#888",marginBottom:12}}>Daha önce yaptığın taksitli alışverişlerin gelecek ay ekstresine yansıyacak tutarları</div>
             {wizardData.recurring.map((r,i)=>(
               <div key={i} style={{background:"#f9f9f9",borderRadius:12,padding:"12px",marginBottom:10}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-                  <input placeholder="ör: Akbank - Geçmiş Taksit" value={r.category} onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],category:e.target.value};setWizardData(p=>({...p,recurring:arr}));}}
-                    style={{flex:1,border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,gap:6}}>
+                  <select value={BANKS.includes(r.category)?r.category:(r.category?"Diğer":"")}
+                    onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],category:e.target.value==="Diğer"?"__diger__":e.target.value};setWizardData(p=>({...p,recurring:arr}));}}
+                    style={{flex:1,border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}>
+                    <option value="">Banka seç...</option>
+                    {BANKS.map(b=><option key={b} value={b}>{b}</option>)}
+                  </select>
+                  {(r.category==="__diger__"||(!BANKS.includes(r.category)&&r.category!==""))&&
+                    <input placeholder="Banka adı yaz" value={r.category==="__diger__"?"":r.category}
+                      onChange={e=>{const arr=[...wizardData.recurring];arr[i]={...arr[i],category:e.target.value};setWizardData(p=>({...p,recurring:arr}));}}
+                      style={{flex:1,border:"1.5px solid #ddd",borderRadius:8,padding:"7px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                  }
                   <button onClick={()=>setWizardData(p=>({...p,recurring:p.recurring.filter((_,j)=>j!==i)}))}
-                    style={{background:"none",border:"none",color:"#c0392b",cursor:"pointer",marginLeft:6,fontSize:16}}>🗑</button>
+                    style={{background:"none",border:"none",color:"#c0392b",cursor:"pointer",fontSize:16}}>🗑</button>
                 </div>
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
                   <div>
