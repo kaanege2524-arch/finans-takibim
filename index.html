@@ -1534,18 +1534,20 @@ Türkçe, samimi, max 350 kelime.`;
               {label:"Snowball",emoji:"⛄",color:"#8e44ad",bg:"#f9f0ff",pays:snowball.pays,months:snowball.maxMonths,interest:snowball.totalInterest,desc:"Küçük borcu önce bitir"},
             ];
 
+            if(flexD.length===0) return <div style={{textAlign:"center",color:"#aaa",padding:20,fontSize:13}}>Esnek borç yok.</div>;
             return <div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-                {scenarios.map(s=>(
-                  <div key={s.label} style={{background:s.bg,border:`2px solid ${s.color}33`,borderRadius:14,padding:"10px 8px",textAlign:"center"}}>
+                {scenarios.map(s=>{
+                  const pays=s.pays;
+                  return <div key={s.label} style={{background:s.bg,border:`2px solid ${s.color}33`,borderRadius:14,padding:"10px 8px",textAlign:"center"}}>
                     <div style={{fontSize:20,marginBottom:4}}>{s.emoji}</div>
                     <div style={{fontSize:11,fontWeight:800,color:s.color,marginBottom:2}}>{s.label}</div>
                     <div style={{fontSize:9,color:"#888",marginBottom:6}}>{s.desc}</div>
                     <div style={{fontSize:11,fontWeight:700,color:"#1a1a2e",marginBottom:1}}>{s.months} ay</div>
                     <div style={{fontSize:10,color:"#e67e22",marginBottom:8}}>Faiz: {fmt(Math.round(s.interest))}</div>
-                    <button onClick={()=>{setDistPays(s.pays);setShowDistribute(true);}} style={{background:s.color,color:"#fff",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:700,cursor:"pointer",width:"100%"}}>Uygula</button>
-                  </div>
-                ))}
+                    <button onClick={(e)=>{e.stopPropagation();const p={...pays};setDistPays(p);setShowDistribute(true);}} style={{background:s.color,color:"#fff",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:700,cursor:"pointer",width:"100%"}}>Uygula</button>
+                  </div>;
+                })}
               </div>
               <div style={{fontSize:11,color:"#888",textAlign:"center",marginBottom:12}}>
                 💡 Avalanche ile Minimum'a göre <strong style={{color:"#27ae60"}}>{fmt(Math.round(minTotI-avalanche.totalInterest))} faiz tasarrufu</strong>
