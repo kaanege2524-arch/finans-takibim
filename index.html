@@ -151,7 +151,7 @@ const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maxi
 
 // ── CASCADE PLANNER ──────────────────────────────────────────────────────────
 // Her ay tüm borçları birlikte hesaplar, kapanan borcun nakitini aktarır
-function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCost=0){
+function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCost=0, recurringExp=[]){
   const MAX_MONTHS = 120;
   const startDate = new Date(2026, 2, 1); // Mart 2026
 
@@ -184,8 +184,18 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
     const flex = active.filter(d => d.type !== "kredi");
     const fixedTotal = fixed.reduce((s, d) => s + Math.min(d.monthly, d.rem), 0);
 
-    // Yaşam gideri düşüldükten sonra esnek borçlara kalan
-    let available = Math.max(0, income - fixedTotal - livingCost);
+    // Bu aya ait geçmiş taksit ödemeleri (kredi kartı ekstrelerine yansıyan)
+    const monthStr = String(d.getFullYear()) + "-" + String(d.getMonth()+1).padStart(2,"0");
+    const recurringThisMonth = recurringExp.filter(r => {
+      if(!r.startDate) return false;
+      const start = new Date(r.startDate);
+      const startMonthIdx = start.getFullYear()*12 + start.getMonth();
+      const curMonthIdx = d.getFullYear()*12 + d.getMonth();
+      return curMonthIdx >= startMonthIdx && curMonthIdx < startMonthIdx + (r.totalMonths||1);
+    }).reduce((s, r) => s + (r.amount||0), 0);
+
+    // Yaşam gideri + geçmiş taksitler düşüldükten sonra borçlara kalan
+    let available = Math.max(0, income - fixedTotal - livingCost - recurringThisMonth);
 
     let sorted;
     if(strategy === "avalanche") sorted = [...flex].sort((a,b) => b.rate - a.rate);
@@ -240,8 +250,8 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
       monthTotal += Math.round(interest + principal);
     });
 
-    const surplus = income - livingCost - monthTotal;
-    monthlyLog.push({ label, monthIdx: mi, income, livingCost, payments, total: monthTotal, surplus });
+    const surplus = income - livingCost - recurringThisMonth - monthTotal;
+    monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, payments, total: monthTotal, surplus });
   }
 
   return monthlyLog;
@@ -316,12 +326,12 @@ const Card=React.forwardRef(function Card({children,style={}},ref){
 })
 function TBadge({type}){
   const m={
-    kredi:     ["#e8f4fd","#2980b9","🏦 Kredi"],
+    kredi:      ["#e8f4fd","#2980b9","🏦 Kredi"],
     kredi_karti:["#fdf3e8","#e67e22","💳 KK"],
-    kmh:       ["#f3e8fd","#8e44ad","🏦 KMH"],
+    kmh:        ["#f3e8fd","#8e44ad","🏦 KMH"],
   };
   const [bg,c,l]=m[type]||["#eee","#555",type];
-  return <span style={{background:bg,color:c,borderRadius:20,padding:"2px 9px",fontSize:10,fontWeight:600}}>{l}</span>;
+  return <span style={{background:bg,color:c,borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:700,letterSpacing:"0.3px"}}>{l}</span>;
 }
 
 // ── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -525,7 +535,9 @@ function App(){
   const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+(e.installments>1?(e.installmentAmt||Math.round(e.amount/e.installments)):e.amount),0);
   const freeIncome=totalIncome-totalMonthly-totalExpenses;
   const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
-  const estLiving=totalExpenses>0?totalExpenses:Math.round(totalIncome*0.35);
+  // Yaşam gideri: sadece nakit ve KMH ödemeleri (k.kartı taksitleri hariç — zaten borç olarak hesaplanıyor)
+  const cashExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth&&(e.payMethod==="nakit"||e.payMethod==="kmh")).reduce((s,e)=>s+e.amount,0);
+  const estLiving=cashExpenses>0?cashExpenses:Math.round(totalIncome*0.25);
   const smart=calcSmart(debts,totalIncome,estLiving);
 
   const creditCards=debts.filter(d=>d.type==="kredi_karti");
@@ -558,10 +570,10 @@ function App(){
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
   const cascadePlans=useMemo(()=>({
-    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", planLiving||estLiving),
-    snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  planLiving||estLiving),
-    minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   planLiving||estLiving),
-  }),[debts,salary,incomes,estLiving,planLiving]);
+    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", planLiving||estLiving, recurringExp),
+    snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  planLiving||estLiving, recurringExp),
+    minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   planLiving||estLiving, recurringExp),
+  }),[debts,salary,incomes,estLiving,planLiving,recurringExp]);
 
   const scenarios=useMemo(()=>{
     function planSummary(plan){
@@ -1733,7 +1745,12 @@ Türkçe, samimi, max 350 kelime.`;
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
                 <div>
                   <div style={{fontSize:14,fontWeight:800}}>{mg.label}</div>
-                  <div style={{fontSize:10,color:"#888"}}>Gelir: {fmt(mg.income)} · Kalan: <span style={{color:mg.surplus>=0?"#27ae60":"#e74c3c",fontWeight:700}}>{fmt(mg.surplus)}</span></div>
+                  <div style={{fontSize:10,color:"#888"}}>
+                    Gelir: {fmt(mg.income)}
+                    {mg.recurringCost>0&&<span style={{color:"#e67e22"}}> · Taksit: {fmt(mg.recurringCost)}</span>}
+                    · Yaşam: {fmt(mg.livingCost)}
+                    · Kalan: <span style={{color:mg.surplus>=0?"#27ae60":"#e74c3c",fontWeight:700}}>{fmt(mg.surplus)}</span>
+                  </div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:15,fontWeight:800,color:"#c0392b"}}>{fmt(mg.total)}</div>
@@ -1741,12 +1758,13 @@ Türkçe, samimi, max 350 kelime.`;
                 </div>
               </div>
               {mg.payments.map((p,pi)=>{
-                const icon=p.type==="kredi"?"🏦":p.type==="kmh"?"💜":"💳";
+                const icon=p.type==="kredi"?"🏦":p.type==="kmh"?"🏦":"💳";
                 const bg=p.type==="kredi"?"#e3f2fd":p.type==="kmh"?"#f3e8fd":"#fff8f0";
+                const typeLabel=p.type==="kredi"?"Kredi":p.type==="kmh"?"KMH":"KK";
                 return <div key={pi} style={{display:"flex",alignItems:"flex-start",padding:"7px 6px",borderRadius:8,marginBottom:2,background:p.finished?"#f0fff4":bg,gap:8,opacity:p.payment===0?0.4:1}}>
                   <div style={{fontSize:17,marginTop:1}}>{p.finished?"✅":icon}</div>
                   <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600}}>{p.name}{p.finished&&<span style={{fontSize:10,color:"#27ae60",marginLeft:6,fontWeight:700}}>KAPANDI 🎉</span>}</div>
+                    <div style={{fontSize:12,fontWeight:600}}>{p.name} <span style={{fontSize:9,fontWeight:700,opacity:.7}}>[{typeLabel}]</span>{p.finished&&<span style={{fontSize:10,color:"#27ae60",marginLeft:6,fontWeight:700}}>KAPANDI 🎉</span>}</div>
                     {p.type!=="kredi"&&<div style={{fontSize:10,color:"#aaa",marginTop:1}}>
                       Faiz: <span style={{color:"#e67e22",fontWeight:600}}>{fmt(p.interest)}</span> · Ana: <span style={{color:"#27ae60",fontWeight:600}}>{fmt(p.principal)}</span> · Kalan: {fmt(p.remaining)}
                     </div>}
