@@ -434,6 +434,35 @@ function App(){
   const plan=useMemo(()=>masterPlan(),[debts]);
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
+  const scenarios=useMemo(()=>{
+    const flexD=debts.filter(d=>d.type!=="kredi");
+    if(flexD.length===0) return [];
+    const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
+    const expTotal=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
+    const available=Math.max(0,totalIncome-fixedTotal-expTotal);
+    function calcS(sorted){
+      let rem=available; const pays={};
+      sorted.forEach(d=>{const min=Math.ceil(d.remaining*0.20);pays[d.id]=min;rem-=min;});
+      for(let i=0;i<sorted.length&&rem>0;i++){
+        const add=Math.min(rem,sorted[i].remaining-pays[sorted[i].id]);
+        if(add>0){pays[sorted[i].id]+=Math.round(add);rem-=Math.round(add);}
+      }
+      let maxM=0,totI=0;
+      sorted.forEach(d=>{const pl=buildFlexPlan({...d,userPayment:pays[d.id]||d.monthly});maxM=Math.max(maxM,pl.length);totI+=pl.reduce((s,r)=>s+(r.interest||0),0);});
+      return {pays,maxM,totI};
+    }
+    const minPays={}; let minMaxM=0,minTotI=0;
+    flexD.forEach(d=>{minPays[d.id]=Math.ceil(d.remaining*0.20);});
+    flexD.forEach(d=>{const pl=buildFlexPlan({...d,userPayment:minPays[d.id]||d.monthly});minMaxM=Math.max(minMaxM,pl.length);minTotI+=pl.reduce((s,r)=>s+(r.interest||0),0);});
+    const av=calcS([...flexD].sort((a,b)=>b.rate-a.rate));
+    const sn=calcS([...flexD].sort((a,b)=>a.remaining-b.remaining));
+    return [
+      {label:"Minimum",emoji:"🐢",color:"#e74c3c",bg:"#fff5f5",pays:minPays,months:minMaxM,interest:minTotI,desc:"Sadece %20 minimum öde"},
+      {label:"Avalanche",emoji:"🏔",color:"#2980b9",bg:"#f0f8ff",pays:av.pays,months:av.maxM,interest:av.totI,desc:"Yüksek faizi önce bitir"},
+      {label:"Snowball",emoji:"⛄",color:"#8e44ad",bg:"#f9f0ff",pays:sn.pays,months:sn.maxM,interest:sn.totI,desc:"Küçük borcu önce bitir"},
+    ];
+  },[debts,allExpenses,totalIncome,curMonth]);
+
   // ── ACTIONS ──────────────────────────────────────────────────────────────
   function saveDebt(){
     if(!dForm.name||!dForm.remaining)return;
@@ -1496,64 +1525,21 @@ Türkçe, samimi, max 350 kelime.`;
             <div style={{fontSize:11,opacity:.75}}>Farklı stratejileri karşılaştır, en iyisini uygula.</div>
           </Card>
 
-          {(()=>{
-            const flexD=debts.filter(d=>d.type!=="kredi");
-            const fixedTotal=debts.filter(d=>d.type==="kredi").reduce((s,d)=>s+d.monthly,0);
-            const expTotal=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
-            const available=Math.max(0,totalIncome-fixedTotal-expTotal);
-
-            // Senaryo hesapla
-            function calcScenario(sortedDebts, available){
-              let rem=available;
-              const pays={};
-              sortedDebts.forEach(d=>{const min=Math.ceil(d.remaining*0.20);pays[d.id]=min;rem-=min;});
-              for(let i=0;i<sortedDebts.length&&rem>0;i++){
-                const add=Math.min(rem,sortedDebts[i].remaining-pays[sortedDebts[i].id]);
-                if(add>0){pays[sortedDebts[i].id]+=Math.round(add);rem-=Math.round(add);}
-              }
-              // Toplam faiz ve süre
-              let maxMonths=0; let totalInterest=0;
-              sortedDebts.forEach(d=>{
-                const pl=buildFlexPlan({...d,userPayment:pays[d.id]||d.monthly});
-                maxMonths=Math.max(maxMonths,pl.length);
-                totalInterest+=pl.reduce((s,r)=>s+(r.interest||0),0);
-              });
-              return {pays,maxMonths,totalInterest};
-            }
-
-            const minPays={}; flexD.forEach(d=>{minPays[d.id]=Math.ceil(d.remaining*0.20);});
-            let minMaxM=0,minTotI=0;
-            flexD.forEach(d=>{const pl=buildFlexPlan({...d,userPayment:minPays[d.id]||d.monthly});minMaxM=Math.max(minMaxM,pl.length);minTotI+=pl.reduce((s,r)=>s+(r.interest||0),0);});
-
-            const avalanche=calcScenario([...flexD].sort((a,b)=>b.rate-a.rate), available);
-            const snowball=calcScenario([...flexD].sort((a,b)=>a.remaining-b.remaining), available);
-
-            const scenarios=[
-              {label:"Minimum",emoji:"🐢",color:"#e74c3c",bg:"#fff5f5",pays:minPays,months:minMaxM,interest:minTotI,desc:"Sadece %20 minimum öde"},
-              {label:"Avalanche",emoji:"🏔",color:"#2980b9",bg:"#f0f8ff",pays:avalanche.pays,months:avalanche.maxMonths,interest:avalanche.totalInterest,desc:"Yüksek faizi önce bitir"},
-              {label:"Snowball",emoji:"⛄",color:"#8e44ad",bg:"#f9f0ff",pays:snowball.pays,months:snowball.maxMonths,interest:snowball.totalInterest,desc:"Küçük borcu önce bitir"},
-            ];
-
-            if(flexD.length===0) return <div style={{textAlign:"center",color:"#aaa",padding:20,fontSize:13}}>Esnek borç yok.</div>;
-            return <div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:12}}>
-                {scenarios.map(s=>{
-                  const pays=s.pays;
-                  return <div key={s.label} style={{background:s.bg,border:`2px solid ${s.color}33`,borderRadius:14,padding:"10px 8px",textAlign:"center"}}>
-                    <div style={{fontSize:20,marginBottom:4}}>{s.emoji}</div>
-                    <div style={{fontSize:11,fontWeight:800,color:s.color,marginBottom:2}}>{s.label}</div>
-                    <div style={{fontSize:9,color:"#888",marginBottom:6}}>{s.desc}</div>
-                    <div style={{fontSize:11,fontWeight:700,color:"#1a1a2e",marginBottom:1}}>{s.months} ay</div>
-                    <div style={{fontSize:10,color:"#e67e22",marginBottom:8}}>Faiz: {fmt(Math.round(s.interest))}</div>
-                    <button onClick={(e)=>{e.stopPropagation();const p={...pays};setDistPays(p);setShowDistribute(true);}} style={{background:s.color,color:"#fff",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:700,cursor:"pointer",width:"100%"}}>Uygula</button>
-                  </div>;
-                })}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:4}}>
+            {scenarios.map(s=>(
+              <div key={s.label} style={{background:s.bg,border:`2px solid ${s.color}33`,borderRadius:14,padding:"10px 8px",textAlign:"center"}}>
+                <div style={{fontSize:20,marginBottom:4}}>{s.emoji}</div>
+                <div style={{fontSize:11,fontWeight:800,color:s.color,marginBottom:2}}>{s.label}</div>
+                <div style={{fontSize:9,color:"#888",marginBottom:6}}>{s.desc}</div>
+                <div style={{fontSize:11,fontWeight:700,color:"#1a1a2e",marginBottom:1}}>{s.months} ay</div>
+                <div style={{fontSize:10,color:"#e67e22",marginBottom:8}}>Faiz: {fmt(Math.round(s.interest))}</div>
+                <button onClick={()=>{setDistPays({...s.pays});setShowDistribute(true);}} style={{background:s.color,color:"#fff",border:"none",borderRadius:8,padding:"5px 8px",fontSize:10,fontWeight:700,cursor:"pointer",width:"100%"}}>Uygula</button>
               </div>
-              <div style={{fontSize:11,color:"#888",textAlign:"center",marginBottom:12}}>
-                💡 Avalanche ile Minimum'a göre <strong style={{color:"#27ae60"}}>{fmt(Math.round(minTotI-avalanche.totalInterest))} faiz tasarrufu</strong>
-              </div>
-            </div>;
-          })()}
+            ))}
+          </div>
+          {scenarios.length>=2&&<div style={{fontSize:11,color:"#888",textAlign:"center",marginBottom:12}}>
+            💡 Avalanche ile Minimum'a göre <strong style={{color:"#27ae60"}}>{fmt(Math.round(scenarios[0].interest-scenarios[1].interest))} faiz tasarrufu</strong>
+          </div>}
 
           {suggApplied&&<Card style={{background:"#e8f5e9",border:"1px solid #c8e6c9",padding:"10px 14px",marginBottom:12}}>
             <div style={{fontSize:12,color:"#2e7d32",fontWeight:600}}>✅ Akıllı öneri tutarları uygulandı!</div>
