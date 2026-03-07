@@ -202,9 +202,9 @@ function Tab({label,active,onClick,badge}){
     {badge!=null&&<span style={{position:"absolute",top:5,right:"8%",background:"#c0392b",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center"}}>{badge}</span>}
   </button>;
 }
-function Card({children,style={}}){
-  return <div style={{background:"#fff",borderRadius:16,padding:"16px 14px",boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:12,...style}}>{children}</div>;
-}
+const Card=React.forwardRef(function Card({children,style={}},ref){
+  return <div ref={ref} style={{background:"#fff",borderRadius:16,padding:"16px 14px",boxShadow:"0 2px 16px rgba(0,0,0,0.06)",marginBottom:12,...style}}>{children}</div>;
+})
 function TBadge({type}){
   const m={kredi:["#e8f4fd","#2980b9","Kredi"],kredi_karti:["#fdf3e8","#e67e22","K.Kartı"],kmh:["#f3e8fd","#8e44ad","KMH"]};
   const [bg,c,l]=m[type]||["#eee","#555",type];
@@ -307,6 +307,7 @@ function App(){
   const [reportLoading,setReportLoading]=useState(false);
   const chatEndRef=useRef(null);
   const chatInputRef=useRef(null);
+  const debtFormRef=useRef(null);
 
   // Modals / forms
   const [editDebtId,setEditDebtId]=useState(null);      // borç düzenleme
@@ -442,7 +443,7 @@ function App(){
   function startEdit(debt){
     setDForm({name:debt.name,type:debt.type,remaining:debt.remaining,monthly:debt.monthly,rate:debt.rate,months:debt.months||"",payDay:debt.payDay||"",userPayment:debt.userPayment||"",kesimGunu:debt.kesimGunu||"",sonOdemeGunu:debt.sonOdemeGunu||""});
     setEditDebtId(debt.id);setShowAddDebt(true);
-    setTimeout(()=>window.scrollTo({top:0,behavior:"smooth"}),50);
+    setTimeout(()=>{if(debtFormRef.current)debtFormRef.current.scrollIntoView({behavior:"smooth",block:"start"});},100);
   }
   function deleteDebt(id){if(window.confirm("Bu borcu silmek istiyor musun?"))setDebts(p=>p.filter(d=>d.id!==id));}
 
@@ -1054,7 +1055,7 @@ Türkçe, samimi, max 350 kelime.`;
           </Card>}
 
           {/* Borç ekleme/düzenleme formu */}
-          {showAddDebt&&<Card style={{border:"2px dashed #c0392b"}}>
+          {showAddDebt&&<Card ref={debtFormRef} style={{border:"2px dashed #c0392b"}}>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#c0392b"}}>{editDebtId?"✏️ Borcu Düzenle":"➕ Yeni Borç"}</div>
             <input style={inp} placeholder="Borç adı" value={dForm.name} onChange={e=>setDForm({...dForm,name:e.target.value})}/>
             <select style={inp} value={dForm.type} onChange={e=>setDForm({...dForm,type:e.target.value})}>
