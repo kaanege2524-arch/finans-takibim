@@ -161,9 +161,10 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
     let total = salary;
     incomes.forEach(inc => {
       if(!inc.recurring) return;
-      if(inc.label && inc.label.includes("Ek Ders")){
-        if(m >= 6 && m <= 8) return; // Temmuz-Eylül yok
-      }
+      // skipMonths: [6,7,8] gibi atlanacak ay indeksleri (0=Ocak)
+      // label kontrolü de kalsın geriye dönük uyumluluk için
+      const skip = inc.skipMonths || (inc.label&&inc.label.toLowerCase().includes("ek ders") ? [6,7,8] : []);
+      if(skip.includes(m)) return;
       total += inc.amount;
     });
     return total;
@@ -544,8 +545,16 @@ function App(){
   const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+(e.installments>1?(e.installmentAmt||Math.round(e.amount/e.installments)):e.amount),0);
   const freeIncome=totalIncome-totalMonthly-totalExpenses;
   const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
-  // Yaşam gideri: sadece kira (sabit 15.000₺) — diğer harcamalar k.kartı/nakit ile zaten borç olarak yansır
-  const estLiving=15000;
+  // Yaşam gideri: sabit giderlerdeki nakit ödemeler (kredi kartı hariç) — örn. kira
+  const recurringNakit=recurringExp.filter(r=>{
+    if(r.payMethod==="kredi_karti"||r.payMethod==="kmh") return false; // k.kartı/KMH ödemeleri zaten borç olarak yansır
+    // Aktif mi kontrol et
+    const start=new Date(r.startDate||"2026-01-01");
+    const startMi=start.getFullYear()*12+start.getMonth();
+    const nowMi=new Date().getFullYear()*12+new Date().getMonth();
+    return nowMi>=startMi && nowMi<startMi+(r.totalMonths||999);
+  }).reduce((s,r)=>s+r.amount,0);
+  const estLiving=recurringNakit>0?recurringNakit:15000;
   const smart=calcSmart(debts,totalIncome,estLiving);
 
   const creditCards=debts.filter(d=>d.type==="kredi_karti");
@@ -1957,16 +1966,25 @@ Türkçe, samimi, max 350 kelime.`;
             </div>
             <div style={{fontSize:12,fontWeight:700,marginBottom:8,marginTop:16}}>Ek Gelirler</div>
             {wizardData.incomes.map((inc,i)=>(
-              <div key={i} style={{display:"flex",gap:8,marginBottom:8,alignItems:"center"}}>
-                <input placeholder="Açıklama" value={inc.label} onChange={e=>{const arr=[...wizardData.incomes];arr[i]={...arr[i],label:e.target.value};setWizardData(p=>({...p,incomes:arr}));}}
-                  style={{flex:2,border:"1.5px solid #ddd",borderRadius:8,padding:"8px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
-                <input type="number" placeholder="Tutar" value={inc.amount} onChange={e=>{const arr=[...wizardData.incomes];arr[i]={...arr[i],amount:Number(e.target.value)};setWizardData(p=>({...p,incomes:arr}));}}
-                  style={{flex:1,border:"1.5px solid #ddd",borderRadius:8,padding:"8px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
-                <button onClick={()=>setWizardData(p=>({...p,incomes:p.incomes.filter((_,j)=>j!==i)}))}
-                  style={{background:"#fdf0f0",color:"#c0392b",border:"none",borderRadius:8,padding:"8px",cursor:"pointer"}}>🗑</button>
+              <div key={i} style={{background:"#f9f9f9",borderRadius:10,padding:"10px",marginBottom:8}}>
+                <div style={{display:"flex",gap:8,marginBottom:6,alignItems:"center"}}>
+                  <input placeholder="Açıklama (ör: Kira Geliri)" value={inc.label} onChange={e=>{const arr=[...wizardData.incomes];arr[i]={...arr[i],label:e.target.value};setWizardData(p=>({...p,incomes:arr}));}}
+                    style={{flex:2,border:"1.5px solid #ddd",borderRadius:8,padding:"8px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                  <input type="number" placeholder="Tutar" value={inc.amount} onChange={e=>{const arr=[...wizardData.incomes];arr[i]={...arr[i],amount:Number(e.target.value)};setWizardData(p=>({...p,incomes:arr}));}}
+                    style={{flex:1,border:"1.5px solid #ddd",borderRadius:8,padding:"8px 10px",fontSize:12,fontFamily:"'Sora',sans-serif"}}/>
+                  <button onClick={()=>setWizardData(p=>({...p,incomes:p.incomes.filter((_,j)=>j!==i)}))}
+                    style={{background:"#fdf0f0",color:"#c0392b",border:"none",borderRadius:8,padding:"8px",cursor:"pointer"}}>🗑</button>
+                </div>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <button onClick={()=>{const arr=[...wizardData.incomes];const cur=arr[i].skipMonths||[];const hasSum=cur.includes(6);arr[i]={...arr[i],skipMonths:hasSum?[]:[ 6,7,8]};setWizardData(p=>({...p,incomes:arr}));}}
+                    style={{fontSize:11,padding:"4px 10px",borderRadius:20,border:"1.5px solid #ddd",background:(inc.skipMonths||[]).includes(6)?"#fff3cd":"#fff",color:(inc.skipMonths||[]).includes(6)?"#856404":"#888",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
+                    ☀️ Yaz ayları gelmiyor (Tem-Ağu-Eyl)
+                  </button>
+                  {(inc.skipMonths||[]).includes(6)&&<span style={{fontSize:10,color:"#e67e22",fontWeight:600}}>✓ Atlanıyor</span>}
+                </div>
               </div>
             ))}
-            <button onClick={()=>setWizardData(p=>({...p,incomes:[...p.incomes,{label:"",amount:0,recurring:true}]}))}
+            <button onClick={()=>setWizardData(p=>({...p,incomes:[...p.incomes,{label:"",amount:0,recurring:true,skipMonths:[]}]}))}
               style={{width:"100%",border:"1.5px dashed #ddd",borderRadius:10,padding:"10px",fontSize:12,color:"#888",background:"none",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>+ Ek Gelir Ekle</button>
           </div>}
 
