@@ -171,6 +171,7 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
 
   let state = debts.map(d => ({ ...d, rem: d.remaining, done: false }));
   const monthlyLog = [];
+  let carryOver = 0; // Önceki aydan kalan fazla nakit
 
   for(let mi = 0; mi < MAX_MONTHS; mi++){
     const income = getMonthlyIncome(mi);
@@ -184,8 +185,7 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
     const flex = active.filter(d => d.type !== "kredi");
     const fixedTotal = fixed.reduce((s, d) => s + Math.min(d.monthly, d.rem), 0);
 
-    // Bu aya ait geçmiş taksit ödemeleri (kredi kartı ekstrelerine yansıyan)
-    const monthStr = String(d.getFullYear()) + "-" + String(d.getMonth()+1).padStart(2,"0");
+    // Bu aya ait geçmiş taksit ödemeleri
     const recurringThisMonth = recurringExp.filter(r => {
       if(!r.startDate) return false;
       const start = new Date(r.startDate);
@@ -194,8 +194,9 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
       return curMonthIdx >= startMonthIdx && curMonthIdx < startMonthIdx + (r.totalMonths||1);
     }).reduce((s, r) => s + (r.amount||0), 0);
 
-    // Yaşam gideri + geçmiş taksitler düşüldükten sonra borçlara kalan
-    let available = Math.max(0, income - fixedTotal - livingCost - recurringThisMonth);
+    // Kullanılabilir nakit = gelir + önceki aydan devir - sabit - yaşam - taksitler
+    let available = Math.max(0, income + carryOver - fixedTotal - livingCost - recurringThisMonth);
+    carryOver = 0; // Sıfırla, bu ay hepsini kullanacağız
 
     let sorted;
     if(strategy === "avalanche") sorted = [...flex].sort((a,b) => b.rate - a.rate);
@@ -215,14 +216,18 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
       let rem = available;
       sorted.forEach(d => {
         const min = Math.min(Math.ceil(d.rem * 0.20), d.rem);
-        pays[d.id] = min;
-        rem -= min;
+        pays[d.id] = Math.min(min, d.rem);
+        rem -= pays[d.id];
       });
-      // TÜM kalan nakiti öncelikli borca ver (cascade etkisi burada!)
+      if(rem < 0) rem = 0;
+      // TÜM kalan nakiti strateji sırasıyla dağıt
       for(let i = 0; i < sorted.length && rem > 0; i++){
-        const add = Math.min(rem, sorted[i].rem - pays[sorted[i].id]);
+        const maxPay = sorted[i].rem; // Borcun tamamını ödeyebiliriz
+        const add = Math.min(rem, maxPay - pays[sorted[i].id]);
         if(add > 0){ pays[sorted[i].id] += Math.round(add); rem -= Math.round(add); }
       }
+      // Tüm borçlar kapandıysa kalan nakit bir sonraki aya devredilir
+      // (döngü sonunda surplus olarak görünür, fiilen sonraki aya carryOver)
     }
 
     const payments = [];
@@ -250,8 +255,12 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
       monthTotal += Math.round(interest + principal);
     });
 
-    const surplus = income - livingCost - recurringThisMonth - monthTotal;
-    monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, payments, total: monthTotal, surplus });
+    const surplus = income + (carryOver) - livingCost - recurringThisMonth - fixedTotal - monthTotal;
+    // Gerçek surplus: available - gerçek ödemeler
+    const realSurplus = available - (monthTotal - fixedTotal);
+    // Fazla nakiti bir sonraki aya devret
+    if(realSurplus > 0) carryOver = realSurplus;
+    monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, payments, total: monthTotal, surplus: Math.round(realSurplus) });
   }
 
   return monthlyLog;
@@ -535,9 +544,8 @@ function App(){
   const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+(e.installments>1?(e.installmentAmt||Math.round(e.amount/e.installments)):e.amount),0);
   const freeIncome=totalIncome-totalMonthly-totalExpenses;
   const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
-  // Yaşam gideri: sadece nakit ve KMH ödemeleri (k.kartı taksitleri hariç — zaten borç olarak hesaplanıyor)
-  const cashExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth&&(e.payMethod==="nakit"||e.payMethod==="kmh")).reduce((s,e)=>s+e.amount,0);
-  const estLiving=cashExpenses>0?cashExpenses:Math.round(totalIncome*0.25);
+  // Yaşam gideri: sadece kira (sabit 15.000₺) — diğer harcamalar k.kartı/nakit ile zaten borç olarak yansır
+  const estLiving=15000;
   const smart=calcSmart(debts,totalIncome,estLiving);
 
   const creditCards=debts.filter(d=>d.type==="kredi_karti");
@@ -1720,8 +1728,8 @@ Türkçe, samimi, max 350 kelime.`;
           <Card style={{padding:"10px 14px",marginBottom:8}}>
             <div style={{display:"flex",alignItems:"center",gap:10}}>
               <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>🏠 Aylık Yaşam Gideri</div>
-                <div style={{fontSize:10,color:"#888"}}>Borç ödemesi dışı sabit yaşam maliyetin</div>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>🏠 Kira (Sabit Gider)</div>
+                <div style={{fontSize:10,color:"#888"}}>Gelirden düşülecek kira tutarı — diğer harcamalar giderler bölümüne</div>
               </div>
               <input type="number" value={planLiving||estLiving} onChange={e=>setPlanLiving(Number(e.target.value))}
                 style={{width:110,border:"1.5px solid #ddd",borderRadius:8,padding:"6px 8px",fontSize:13,textAlign:"right",fontFamily:"'Sora',sans-serif"}}/>
