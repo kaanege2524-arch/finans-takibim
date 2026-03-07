@@ -247,13 +247,9 @@ function buildCascadePlan(debts, salary, incomes, strategy="avalanche", livingCo
       monthTotal += Math.round(interest + principal);
     });
 
-    // Gerçek surplus: tüm ödemeler ve yaşam gideri düşüldükten sonra kalan
-    // available = income + carryOver - fixedTotal - livingCost
-    // monthTotal = fixed + flex ödemeleri
-    const realSurplus = available - monthTotal; // available zaten fixedTotal düşülmüş, monthTotal'da fixed var
-    // NOT: available içinde fixedTotal düşüldü, ama monthTotal'da fixed ödemeler var
-    // Doğru formül: income + carryOver - livingCost - monthTotal
-    const trueSurplus = Math.max(0, income + carryOver - livingCost - monthTotal);
+    // Gerçek surplus: available - tüm flex ödemeler (fixed zaten available'dan düşüldü)
+    const flexPaid = monthTotal - fixedTotal;
+    const trueSurplus = Math.max(0, available - flexPaid);
     carryOver = trueSurplus;
     const additions = DEBT_ADDITIONS.filter(a=>a.month===monthStr2);
     monthlyLog.push({ label, monthIdx: mi, income, livingCost, recurringCost: recurringThisMonth, additions, payments, total: monthTotal, surplus: Math.round(trueSurplus) });
@@ -540,16 +536,7 @@ function App(){
   const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+(e.installments>1?(e.installmentAmt||Math.round(e.amount/e.installments)):e.amount),0);
   const freeIncome=totalIncome-totalMonthly-totalExpenses;
   const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
-  // Yaşam gideri: sabit giderlerdeki nakit ödemeler (kredi kartı hariç) — örn. kira
-  const recurringNakit=recurringExp.filter(r=>{
-    if(r.payMethod==="kredi_karti"||r.payMethod==="kmh") return false; // k.kartı/KMH ödemeleri zaten borç olarak yansır
-    // Aktif mi kontrol et
-    const start=new Date(r.startDate||"2026-01-01");
-    const startMi=start.getFullYear()*12+start.getMonth();
-    const nowMi=new Date().getFullYear()*12+new Date().getMonth();
-    return nowMi>=startMi && nowMi<startMi+(r.totalMonths||999);
-  }).reduce((s,r)=>s+r.amount,0);
-  const estLiving=recurringNakit>0?recurringNakit:15000;
+  const estLiving=15000; // Sabit kira — diğer giderler kartlarla ödeniyor
   const smart=calcSmart(debts,totalIncome,estLiving);
 
   const creditCards=debts.filter(d=>d.type==="kredi_karti");
