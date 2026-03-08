@@ -118,8 +118,8 @@ const initDebts=[
 const initExpenses=[];
 
 const initIncomes=[
-  {id:1,label:"Kira Geliri",amount:15000,date:"2026-03-07",recurring:true},
-  {id:2,label:"Ek Ders (Ekim-Haziran)",amount:18000,date:"2026-03-07",recurring:true},
+  {id:1,label:"Kira Geliri",amount:15000,date:"2026-03-07",recurring:true,skipMonths:[],startMonth:"2026-03",endMonth:""},
+  {id:2,label:"Ek Ders",amount:18000,date:"2026-03-07",recurring:true,skipMonths:[6,7,8],startMonth:"2026-03",endMonth:""},
 ];
 
 const BASE_CATS=[
@@ -154,10 +154,22 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
   function monthIncome(mi){
     const absMonth = START_MONTH + mi;
     const m = absMonth % 12; // 0-indexed ay
+    const y = START_YEAR + Math.floor(absMonth / 12);
+    const msStr = y + "-" + String(m+1).padStart(2,"0");
     let total = salary;
     (incomes||[]).forEach(inc => {
-      if(!inc.recurring && !inc.amount) return;
-      const skip = inc.skipMonths || ((inc.label||"").toLowerCase().includes("ek ders") ? [6,7,8] : []);
+      if(!inc.amount) return;
+      // Tekrarlayan değilse sadece kendi ayında say
+      if(!inc.recurring){
+        if((inc.date||"").slice(0,7) === msStr) total += (inc.amount||0);
+        return;
+      }
+      // Başlangıç ayı kontrolü
+      if(inc.startMonth && msStr < inc.startMonth) return;
+      // Bitiş ayı kontrolü
+      if(inc.endMonth && msStr > inc.endMonth) return;
+      // Skip ayları (0=Ocak)
+      const skip = inc.skipMonths || [];
       if(skip.includes(m)) return;
       total += (inc.amount||0);
     });
@@ -508,7 +520,10 @@ function App(){
   const [rForm,setRForm]=useState(blankRecurring);
   const [catForm,setCatForm]=useState({name:"",icon:"📌"});
 
-  const [iForm,setIForm]=useState({label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:false});
+  const [iForm,setIForm]=useState({label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:true,skipMonths:[],startMonth:new Date().toISOString().slice(0,7),endMonth:""});
+  const [editIncomeId,setEditIncomeId]=useState(null);
+  const blankIForm={label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:true,skipMonths:[],startMonth:new Date().toISOString().slice(0,7),endMonth:""};
+  const MONTH_NAMES=["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
 
   // Kart alışverişi formu
   const blankPurchase={cardId:"",description:"",amount:"",installments:1,date:new Date().toISOString().slice(0,10)};
@@ -621,7 +636,7 @@ function App(){
     snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
     minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   livingForPlan, recurringExp),
     manuel:    buildCascadePlan(debts, salary, incomes, "manuel",    livingForPlan, recurringExp),
-  }),[debts, salary, incomes, livingForPlan]);
+  }),[debts, salary, incomes, livingForPlan, recurringExp]);
   const cascadeThisMonth = cascadePlans?.[selectedStrategy]?.[0];
   // Bu ayın gerçek borç ödemesi = gelir - kira - net kalan (cascade surplus)
   // Cascade güvenilir değilse direkt hesapla
@@ -1338,63 +1353,149 @@ Türkçe, samimi, max 350 kelime.`;
 
         {/* ══ GELİRLER ════════════════════════════════════════════════════ */}
         {tab==="gelirler"&&<>
+          {/* Başlık kartı */}
           <Card style={{background:"linear-gradient(135deg,#0d6e5a,#16a085)",color:"#fff",padding:"16px"}}>
             <div style={{fontSize:11,opacity:.75,marginBottom:4}}>Bu Ay Toplam Gelir</div>
             <div style={{fontSize:28,fontWeight:800,marginBottom:12}}>{fmt(totalIncome)}</div>
             <div style={{display:"flex",gap:8}}>
-              {[["Maaş",fmt(salary)],["Ek Gelirler",fmt(thisMonthExtra)]].map(([l,v])=>(
+              {[["🏛 Maaş",fmt(salary)],["💰 Ek Gelirler",fmt(thisMonthExtra)]].map(([l,v])=>(
                 <div key={l} style={{flex:1,background:"rgba(255,255,255,.15)",borderRadius:12,padding:"10px 12px"}}>
                   <div style={{fontSize:10,opacity:.75}}>{l}</div><div style={{fontSize:16,fontWeight:800}}>{v}</div>
                 </div>
               ))}
             </div>
           </Card>
+
+          {/* Maaş */}
           <Card>
             <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:10}}>🏛 Aylık Maaş</div>
             <div style={{display:"flex",gap:8}}>
-              <input type="number" value={salaryInput} onChange={e=>setSalaryInput(e.target.value)} style={{...inp,marginBottom:0,flex:1,fontSize:15,fontWeight:700}} placeholder="Aylık net maaş"/>
-              <button onClick={()=>setSalary(Number(salaryInput))} style={{...btnS("#16a085"),width:"auto",padding:"10px 16px",fontSize:13}}>Kaydet</button>
+              <input type="number" value={salaryInput} onChange={e=>setSalaryInput(e.target.value)}
+                style={{...inp,marginBottom:0,flex:1,fontSize:15,fontWeight:700}} placeholder="Aylık net maaş"/>
+              <button onClick={()=>{setSalary(Number(salaryInput));showToast("✅ Maaş güncellendi");}}
+                style={{...btnS("#16a085"),width:"auto",padding:"10px 16px",fontSize:13}}>Kaydet</button>
             </div>
           </Card>
+
+          {/* Gelir Ekle/Düzenle Formu */}
+          {showAddIncome&&<Card style={{border:"1.5px solid #16a085",background:"#f0fffe"}}>
+            <div style={{fontSize:13,fontWeight:700,color:"#0d6e5a",marginBottom:12}}>
+              {editIncomeId?"✏️ Gelir Düzenle":"+ Yeni Gelir Ekle"}
+            </div>
+            <input style={inp} placeholder="Gelir adı (örn: Kira Geliri, Ek Ders)" value={iForm.label}
+              onChange={e=>setIForm({...iForm,label:e.target.value})}/>
+            <input style={inp} type="number" placeholder="Aylık tutar (₺)" value={iForm.amount}
+              onChange={e=>setIForm({...iForm,amount:e.target.value})}/>
+
+            <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:10,cursor:"pointer"}}>
+              <input type="checkbox" checked={iForm.recurring} onChange={e=>setIForm({...iForm,recurring:e.target.checked})} style={{accentColor:"#16a085"}}/>
+              <span style={{fontWeight:600}}>Her ay tekrarlayan gelir</span>
+            </label>
+
+            {iForm.recurring&&<>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+                <div>
+                  <div style={{fontSize:11,color:"#888",marginBottom:3}}>Başlangıç ayı</div>
+                  <input type="month" value={iForm.startMonth}
+                    onChange={e=>setIForm({...iForm,startMonth:e.target.value})}
+                    style={{...inp,marginBottom:0,fontSize:12}}/>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:"#888",marginBottom:3}}>Bitiş ayı (boş=süresiz)</div>
+                  <input type="month" value={iForm.endMonth}
+                    onChange={e=>setIForm({...iForm,endMonth:e.target.value})}
+                    style={{...inp,marginBottom:0,fontSize:12}}/>
+                </div>
+              </div>
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>Bu aylarda YOK (tıkla seç)</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {MONTH_NAMES.map((mn,i)=>{
+                    const sel=(iForm.skipMonths||[]).includes(i);
+                    return <button key={i} onClick={()=>{
+                      const s=iForm.skipMonths||[];
+                      setIForm({...iForm,skipMonths:sel?s.filter(x=>x!==i):[...s,i]});
+                    }} style={{padding:"4px 9px",fontSize:11,borderRadius:20,border:`1.5px solid ${sel?"#e74c3c":"#e0e0e0"}`,
+                      background:sel?"#fdf0f0":"#fff",color:sel?"#c0392b":"#666",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
+                      {mn}
+                    </button>;
+                  })}
+                </div>
+                {(iForm.skipMonths||[]).length>0&&<div style={{fontSize:10,color:"#e74c3c",marginTop:4}}>
+                  ⛔ {(iForm.skipMonths).map(i=>MONTH_NAMES[i]).join(", ")} aylarında bu gelir sayılmayacak
+                </div>}
+              </div>
+            </>}
+
+            {!iForm.recurring&&<>
+              <div style={{fontSize:11,color:"#888",marginBottom:3}}>Gelir tarihi</div>
+              <input style={inp} type="date" value={iForm.date} onChange={e=>setIForm({...iForm,date:e.target.value})}/>
+            </>}
+
+            <div style={{display:"flex",gap:8,marginTop:4}}>
+              <button onClick={()=>{
+                if(!iForm.label||!iForm.amount)return;
+                const rec={id:editIncomeId||Date.now(),...iForm,amount:Number(iForm.amount),skipMonths:iForm.skipMonths||[]};
+                if(editIncomeId){setIncomes(p=>p.map(x=>x.id===editIncomeId?rec:x));}
+                else{setIncomes(p=>[...p,rec]);}
+                setIForm(blankIForm);setEditIncomeId(null);setShowAddIncome(false);
+                showToast("✅ Gelir kaydedildi");
+              }} style={btnS("#16a085")}>💾 Kaydet</button>
+              <button onClick={()=>{setShowAddIncome(false);setEditIncomeId(null);setIForm(blankIForm);}}
+                style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
+            </div>
+          </Card>}
+
+          {/* Gelir Listesi */}
           <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div><div style={{fontSize:13,fontWeight:700}}>💰 Ek Gelirlerim</div><div style={{fontSize:10,color:"#aaa"}}>İkramiye, fazla mesai, kira vb.</div></div>
-              <button onClick={()=>setShowAddIncome(!showAddIncome)} style={{...btnS("#16a085"),width:"auto",padding:"7px 13px",fontSize:12}}>+ Ekle</button>
-            </div>
-            {showAddIncome&&<div style={{background:"#f0fffe",border:"1.5px dashed #16a085",borderRadius:12,padding:"13px",marginBottom:12}}>
-              <input style={inp} placeholder="Gelir adı" value={iForm.label} onChange={e=>setIForm({...iForm,label:e.target.value})}/>
-              <input style={inp} type="number" placeholder="Tutar (₺)" value={iForm.amount} onChange={e=>setIForm({...iForm,amount:e.target.value})}/>
-              <input style={inp} type="date" value={iForm.date} onChange={e=>setIForm({...iForm,date:e.target.value})}/>
-              <label style={{display:"flex",alignItems:"center",gap:8,fontSize:12,marginBottom:8,cursor:"pointer"}}>
-                <input type="checkbox" checked={iForm.recurring} onChange={e=>setIForm({...iForm,recurring:e.target.checked})} style={{accentColor:"#16a085"}}/>
-                Her ay tekrarlanır
-              </label>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{if(!iForm.label||!iForm.amount)return;setIncomes(p=>[...p,{id:Date.now(),...iForm,amount:Number(iForm.amount)}]);setIForm({label:"",amount:"",date:new Date().toISOString().slice(0,10),recurring:false});setShowAddIncome(false);}} style={btnS("#16a085")}>Kaydet</button>
-                <button onClick={()=>setShowAddIncome(false)} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
+              <div>
+                <div style={{fontSize:13,fontWeight:700}}>💰 Gelir Kalemleri</div>
+                <div style={{fontSize:10,color:"#aaa"}}>Kira, ek ders, ikramiye vb.</div>
               </div>
-            </div>}
+              <button onClick={()=>{setIForm(blankIForm);setEditIncomeId(null);setShowAddIncome(true);}}
+                style={{...btnS("#16a085"),width:"auto",padding:"7px 13px",fontSize:12}}>+ Ekle</button>
+            </div>
             {incomes.length===0&&<div style={{textAlign:"center",padding:"16px",color:"#ccc",fontSize:13}}>Henüz ek gelir yok</div>}
-            {incomes.filter(e=>e.recurring).length>0&&<><div style={{fontSize:10,fontWeight:700,color:"#888",marginBottom:6}}>🔄 TEKRARLAYAN</div>
-              {incomes.filter(e=>e.recurring).map(e=>(
-                <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",borderRadius:11,marginBottom:6,background:"#f0fffe",border:"1px solid #b2dfdb"}}>
-                  <div style={{fontSize:20}}>🔄</div>
-                  <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>{e.label}</div><div style={{fontSize:10,color:"#16a085"}}>Her ay</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:800,color:"#16a085"}}>{fmt(e.amount)}</div>
-                  <button onClick={()=>setIncomes(p=>p.filter(x=>x.id!==e.id))} style={{fontSize:10,color:"#ccc",background:"none",border:"none",cursor:"pointer"}}>✕</button></div>
+            {incomes.map(e=>{
+              const skip=(e.skipMonths||[]);
+              const curMonthIdx2=new Date().getMonth();
+              const isActiveNow=e.recurring
+                ? (!e.startMonth||curMonth>=e.startMonth)&&(!e.endMonth||curMonth<=e.endMonth)&&!skip.includes(curMonthIdx2)
+                : e.date?.slice(0,7)===curMonth;
+              return <div key={e.id} style={{padding:"10px 12px",borderRadius:12,marginBottom:8,
+                background:isActiveNow?"#f0fffe":"#fafafa",border:isActiveNow?"1px solid #b2dfdb":"1px solid #eee"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:3}}>
+                      <span style={{fontSize:13,fontWeight:700}}>{e.label}</span>
+                      {e.recurring
+                        ? <span style={{fontSize:9,background:"#e8f8f5",color:"#16a085",borderRadius:20,padding:"1px 7px",fontWeight:700}}>🔄 Tekrarlayan</span>
+                        : <span style={{fontSize:9,background:"#f0f4ff",color:"#3498db",borderRadius:20,padding:"1px 7px",fontWeight:700}}>💵 Tek seferlik</span>}
+                      {!isActiveNow&&<span style={{fontSize:9,background:"#fdf0f0",color:"#e74c3c",borderRadius:20,padding:"1px 7px",fontWeight:700}}>⏸ Bu ay yok</span>}
+                    </div>
+                    <div style={{fontSize:11,color:"#888"}}>
+                      {e.recurring
+                        ? <>
+                            {e.startMonth&&`${e.startMonth} `}{e.endMonth?`→ ${e.endMonth}`:"→ süresiz"}
+                            {skip.length>0&&<span style={{color:"#e74c3c",marginLeft:6}}>⛔ {skip.map(i=>MONTH_NAMES[i]).join(",")} hariç</span>}
+                          </>
+                        : new Date(e.date).toLocaleDateString("tr-TR")}
+                    </div>
+                  </div>
+                  <div style={{textAlign:"right",display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+                    <div style={{fontSize:15,fontWeight:800,color:isActiveNow?"#16a085":"#aaa"}}>{fmt(e.amount)}</div>
+                    <div style={{display:"flex",gap:5}}>
+                      <button onClick={()=>{setIForm({...e,skipMonths:e.skipMonths||[],startMonth:e.startMonth||"",endMonth:e.endMonth||""});setEditIncomeId(e.id);setShowAddIncome(true);}}
+                        style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 8px",fontSize:11,cursor:"pointer"}}>✏️</button>
+                      <button onClick={()=>{if(window.confirm("Bu geliri sil?"))setIncomes(p=>p.filter(x=>x.id!==e.id));}}
+                        style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 8px",fontSize:11,cursor:"pointer"}}>🗑</button>
+                    </div>
+                  </div>
                 </div>
-              ))}</>}
-            {incomes.filter(e=>!e.recurring).length>0&&<><div style={{fontSize:10,fontWeight:700,color:"#888",marginBottom:6,marginTop:8}}>💵 TEK SEFERLİK</div>
-              {incomes.filter(e=>!e.recurring).map(e=>{
-                const active=e.date.slice(0,7)===curMonth;
-                return <div key={e.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 11px",borderRadius:11,marginBottom:6,background:active?"#f0fffe":"#fafafa",border:active?"1px solid #b2dfdb":"1px solid #eee"}}>
-                  <div style={{fontSize:20}}>💵</div>
-                  <div style={{flex:1}}><div style={{fontSize:12,fontWeight:700}}>{e.label}</div><div style={{fontSize:10,color:"#aaa"}}>{new Date(e.date).toLocaleDateString("tr-TR")}{active&&<span style={{color:"#16a085",marginLeft:6,fontWeight:600}}>• Bu ay</span>}</div></div>
-                  <div style={{textAlign:"right"}}><div style={{fontSize:14,fontWeight:800,color:active?"#16a085":"#999"}}>{fmt(e.amount)}</div>
-                  <button onClick={()=>setIncomes(p=>p.filter(x=>x.id!==e.id))} style={{fontSize:10,color:"#ccc",background:"none",border:"none",cursor:"pointer"}}>✕</button></div>
-                </div>;
-              })}</>}
-            {thisMonthExtra>0&&<div style={{marginTop:10,padding:"10px 12px",background:"#e8f8f5",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
+              </div>;
+            })}
+            {thisMonthExtra>0&&<div style={{marginTop:6,padding:"10px 12px",background:"#e8f8f5",borderRadius:10,display:"flex",justifyContent:"space-between"}}>
               <span style={{fontSize:12,color:"#0d6e5a",fontWeight:600}}>Bu ay toplam ek gelir</span>
               <span style={{fontSize:14,fontWeight:800,color:"#16a085"}}>{fmt(thisMonthExtra)}</span>
             </div>}
