@@ -745,6 +745,101 @@ function App(){
     return exps;
   }
 
+
+  // ── SES İLE HARCAMA ──────────────────────────────────────────────────────
+  const [voiceActive, setVoiceActive] = useState(false);
+  const [voiceText, setVoiceText]     = useState("");
+  const [voiceResult, setVoiceResult] = useState(null);
+
+  function parseVoiceExpense(text){
+    const t = text.toLowerCase().trim();
+
+    // Tutar: "iki yüz elli", "250", "iki yüz elli lira"
+    const sayilar = {"bir":1,"iki":2,"üç":3,"dört":4,"beş":5,"altı":6,"yedi":7,"sekiz":8,"dokuz":9,
+      "on":10,"yirmi":20,"otuz":30,"kırk":40,"elli":50,"altmış":60,"yetmiş":70,"seksen":80,"doksan":90,
+      "yüz":100,"bin":1000};
+    let amount = 0;
+    const numMatch = t.match(/\d+/);
+    if(numMatch) {
+      amount = parseInt(numMatch[0]);
+    } else {
+      let cur = 0, total = 0;
+      t.split(/\s+/).forEach(w => {
+        const n = sayilar[w];
+        if(n === undefined) return;
+        if(n === 100){ cur = cur === 0 ? 100 : cur * 100; }
+        else if(n === 1000){ total += (cur === 0 ? 1 : cur) * 1000; cur = 0; }
+        else { cur += n; }
+      });
+      amount = total + cur;
+    }
+
+    // Kategori tespiti
+    const catMap = [
+      {keys:["market","alışveriş","migros","carrefour","bim","a101","şok","süpermarket"], cat:"Market"},
+      {keys:["restoran","yemek","lokanta","café","kafe","kahve","burger","pizza","döner","fast food"], cat:"Yemek & İçecek"},
+      {keys:["taksi","uber","araç","benzin","akaryakıt","otobüs","metro","ulaşım","servis"], cat:"Ulaşım"},
+      {keys:["elektrik","su","doğalgaz","internet","fatura","aidat"], cat:"Faturalar"},
+      {keys:["sinema","eğlence","konser","oyun","netflix","spotify","dizi"], cat:"Eğlence"},
+      {keys:["giysi","kıyafet","ayakkabı","çanta","giyim"], cat:"Giyim"},
+      {keys:["ilaç","eczane","doktor","hastane","sağlık"], cat:"Sağlık"},
+      {keys:["kitap","kırtasiye","kurs","eğitim"], cat:"Eğitim"},
+    ];
+    let category = "Diğer";
+    for(const {keys,cat} of catMap){
+      if(keys.some(k => t.includes(k))){ category = cat; break; }
+    }
+
+    // Ödeme yöntemi
+    let payMethod = "nakit";
+    if(t.includes("kart") || t.includes("kredi")) payMethod = "kredi_karti";
+    else if(t.includes("kmh") || t.includes("kredili")) payMethod = "kmh";
+
+    return {amount, category, payMethod};
+  }
+
+  function startVoice(){
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if(!SR){ alert("Tarayıcınız ses tanımayı desteklemiyor. Chrome veya Safari kullanın."); return; }
+    const rec = new SR();
+    rec.lang = "tr-TR";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    setVoiceActive(true);
+    setVoiceText("");
+    setVoiceResult(null);
+    rec.onresult = e => {
+      const txt = e.results[0][0].transcript;
+      setVoiceText(txt);
+      const parsed = parseVoiceExpense(txt);
+      setVoiceResult(parsed);
+      setVoiceActive(false);
+    };
+    rec.onerror = () => setVoiceActive(false);
+    rec.onend   = () => setVoiceActive(false);
+    rec.start();
+  }
+
+  function applyVoiceExpense(){
+    if(!voiceResult || !voiceResult.amount) return;
+    const today = new Date().toISOString().slice(0,10);
+    const cat = CATS.find(c=>c.name===voiceResult.category) || CATS[0];
+    if(voiceResult.payMethod === "kredi_karti" && creditCards.length > 0){
+      setQuickForm(prev=>({...prev, category:voiceResult.category, amount:String(voiceResult.amount),
+        payMethod:"kredi_karti", cardId:String(creditCards[0].id), installments:1, date:today}));
+    } else if(voiceResult.payMethod === "kmh"){
+      const kmhs = debts.filter(d=>d.type==="kmh");
+      setQuickForm(prev=>({...prev, category:voiceResult.category, amount:String(voiceResult.amount),
+        payMethod:"kmh", kmhId:String(kmhs[0]?.id||""), date:today}));
+    } else {
+      setQuickForm(prev=>({...prev, category:voiceResult.category, amount:String(voiceResult.amount),
+        payMethod:"nakit", date:today}));
+    }
+    setShowQuickExp(true);
+    setVoiceResult(null);
+    setVoiceText("");
+  }
+
   function saveQuickExp(){
     if(!quickForm.amount||!quickForm.category)return;
     const catObj=CATS.find(c=>c.name===quickForm.category);
@@ -974,6 +1069,9 @@ Türkçe, samimi, max 350 kelime.`;
             <button onClick={()=>setShowQuickExp(true)} style={{background:"rgba(255,255,255,.22)",border:"1px solid rgba(255,255,255,.4)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:13,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
               ⚡ Harcama
             </button>
+            <button onClick={startVoice} style={{background:voiceActive?"rgba(231,76,60,.7)":"rgba(255,255,255,.18)",border:`1px solid ${voiceActive?"rgba(231,76,60,.9)":"rgba(255,255,255,.3)"}`,color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:13,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700,transition:"all .2s"}}>
+              {voiceActive?"🔴 Dinliyor...":"🎤"}
+            </button>
             <button onClick={exportExcel} style={{background:"rgba(255,255,255,.18)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
               📊 Excel
             </button>
@@ -988,6 +1086,29 @@ Türkçe, samimi, max 350 kelime.`;
         </div>
 
         {/* ── HIZLI GİDER MODAL ──────────────────────────────────────────── */}
+        {/* Ses sonucu kartı — modal dışında, üstte görünür */}
+        {voiceResult&&!showQuickExp&&<div style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",zIndex:200,width:"calc(100% - 32px)",maxWidth:480}}>
+          <div style={{background:"#1a1a2e",borderRadius:16,padding:"14px 16px",boxShadow:"0 8px 32px rgba(0,0,0,.4)"}}>
+            <div style={{fontSize:11,color:"#aaa",marginBottom:4}}>🎤 Duyduğum: <span style={{color:"#fff",fontWeight:600}}>"{voiceText}"</span></div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:800,color:"#e74c3c"}}>{new Intl.NumberFormat("tr-TR").format(voiceResult.amount)}₺</div>
+                <div style={{fontSize:12,color:"#aaa"}}>{voiceResult.category} · {voiceResult.payMethod==="nakit"?"💵 Nakit":voiceResult.payMethod==="kredi_karti"?"💳 Kart":"🏦 KMH"}</div>
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{setVoiceResult(null);setVoiceText("");}} style={{background:"rgba(255,255,255,.1)",border:"none",color:"#aaa",borderRadius:10,padding:"8px 12px",fontSize:12,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>✕ İptal</button>
+                <button onClick={applyVoiceExpense} style={{background:"linear-gradient(135deg,#27ae60,#2ecc71)",border:"none",color:"#fff",borderRadius:10,padding:"8px 16px",fontSize:13,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>✓ Kaydet</button>
+              </div>
+            </div>
+            <div style={{fontSize:10,color:"#666"}}>💡 Düzenlemek için "Kaydet"e bas — form açılır, kontrol edip onaylarsın</div>
+          </div>
+        </div>}
+        {voiceText&&!voiceResult&&voiceActive===false&&<div style={{position:"fixed",bottom:90,left:"50%",transform:"translateX(-50%)",zIndex:200,width:"calc(100% - 32px)",maxWidth:480}}>
+          <div style={{background:"#fff3e0",borderRadius:12,padding:"10px 14px",border:"1.5px solid #ff9800",fontSize:12,color:"#e65100"}}>
+            ⚠️ Anlayamadım: "{voiceText}" — Tekrar dene veya ⚡ Harcama butonunu kullan
+          </div>
+        </div>}
+
         {showQuickExp&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowQuickExp(false);}}>
           <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480,boxSizing:"border-box"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
