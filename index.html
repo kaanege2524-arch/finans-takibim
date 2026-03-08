@@ -462,9 +462,7 @@ function App(){
   const [showFullPlan,setShowFullPlan]=useState(false);
   const [expandedMonths,setExpandedMonths]=useState(new Set());
   const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
-  const [planLiving,setPlanLiving]=useLS("ft_planliving", 27000);
-  // localStorage'daki eski düşük değeri düzelt (önceki session 15000 kaydetmiş olabilir)
-  React.useEffect(()=>{ if(!planLiving || planLiving < 1000) setPlanLiving(27000); },[]);
+  const [planLiving,setPlanLiving]=useLS("ft_planliving3", 27000);
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
@@ -916,7 +914,20 @@ Türkçe, samimi, max 350 kelime.`;
   const btnS=(bg="#16a085")=>({...btnP,background:bg});
 
   const pieData=debts.map(d=>({name:d.name,value:d.remaining}));
-  const chartData=Array.from({length:6},(_,i)=>{const m=new Date(2026,2+i,1);return{label:MONTHS[m.getMonth()].slice(0,3),value:Math.max(0,Math.round((totalDebt-totalMonthly*(i+1)*1.05)/1000))};});
+  const chartData = (() => {
+    const plan = cascadePlans?.[selectedStrategy] || [];
+    // İlk 6 ay için toplam kalan borç (o ay sonunda)
+    const months = Array.from({length:6},(_,i)=>{
+      const m = new Date(2026,2+i,1);
+      const label = MONTHS[m.getMonth()].slice(0,3);
+      const monthPlan = plan[i];
+      if(!monthPlan) return {label, value:0};
+      const totalRem = monthPlan.payments.reduce((s,p)=>s+p.remaining,0);
+      return {label, value:Math.round(totalRem/1000)};
+    });
+    // Plan başlamadan önceki (Mart başı) toplam borç
+    return [{label:"Başlangıç", value:Math.round(totalDebt/1000)}, ...months].slice(0,6);
+  })();
   const catData=CATS.map(c=>({name:c.name,tutar:allExpenses.filter(e=>e.category===c.name).reduce((s,e)=>s+e.amount,0)})).filter(c=>c.tutar>0);
 
   // ── RENDER ───────────────────────────────────────────────────────────────
@@ -1130,8 +1141,14 @@ Türkçe, samimi, max 350 kelime.`;
                   </div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>{fmt(c.userPayment||c.monthly)}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>aylık ödeme</div>
+                  {(()=>{
+                    const p = cascadeThisMonth?.payments?.find(p=>p.id===c.id);
+                    const amt = p ? p.payment : (c.userPayment||c.monthly);
+                    return <>
+                      <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>{fmt(amt)}</div>
+                      <div style={{fontSize:10,color:"#aaa"}}>{p?"bu ay planı":"aylık ödeme"}</div>
+                    </>;
+                  })()}
                 </div>
               </div>
             ))}
