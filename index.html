@@ -622,8 +622,11 @@ function App(){
     manuel:    buildCascadePlan(debts, salary, incomes, "manuel",    livingForPlan, recurringExp),
   }),[debts, salary, incomes, livingForPlan]);
   const cascadeThisMonth = cascadePlans?.[selectedStrategy]?.[0];
+  // Cascade'in bu ay için hesapladığı değerleri direkt kullan
   const cascadeMonthlyTotal = cascadeThisMonth ? cascadeThisMonth.total : totalMonthly;
-  const cascadeFreeIncome = totalIncome - livingForPlan - cascadeMonthlyTotal - totalExpenses;
+  const cascadeKira = cascadeThisMonth ? cascadeThisMonth.livingCost : livingForPlan;
+  // Net kalan = cascade surplus'ı (gelir - kira - borçlar = cascade zaten hesapladı)
+  const cascadeFreeIncome = cascadeThisMonth ? cascadeThisMonth.surplus : (totalIncome - livingForPlan - totalMonthly - totalExpenses);
 
   const scenarios=useMemo(()=>{
     function planSummary(plan){
@@ -1057,11 +1060,11 @@ Türkçe, samimi, max 350 kelime.`;
             <div style={{fontSize:10,opacity:.65}}>Toplam Gelir</div>
             <div style={{fontSize:18,fontWeight:800}}>{fmt(totalIncome)}</div>
             {thisMonthExtra>0&&<div style={{fontSize:9,marginTop:2,color:"#a8f0c6"}}>+Ek {fmt(thisMonthExtra)}</div>}
-            <div style={{fontSize:9,marginTop:1,color:"#ff9090",opacity:.8}}>Kira+Borç: -{fmt(livingForPlan+cascadeMonthlyTotal)}</div>
+            <div style={{fontSize:9,marginTop:1,color:"#ff9090",opacity:.8}}>Kira+Borç: -{fmt(cascadeKira+cascadeMonthlyTotal)}</div>
           </div>
           <div style={{flex:1,background:freeIncome>=0?"rgba(46,204,113,.2)":"rgba(231,76,60,.35)",borderRadius:14,padding:"10px 12px",border:freeIncome<0?"1px solid rgba(231,76,60,.5)":"none"}}>
             <div style={{fontSize:10,opacity:.65}}>Net Kalan</div>
-            <div style={{fontSize:18,fontWeight:800,color:freeIncome<0?"#ff9090":"#a8f0c6"}}>{fmt(freeIncome)}</div>
+            <div style={{fontSize:18,fontWeight:800,color:cascadeFreeIncome<0?"#ff9090":"#a8f0c6"}}>{fmt(cascadeFreeIncome)}</div>
           </div>
         </div>
         <div style={{background:"rgba(255,255,255,.1)",borderRadius:12,padding:"10px 12px"}}>
@@ -1201,7 +1204,7 @@ Türkçe, samimi, max 350 kelime.`;
           </Card>
           {totalIncome>0&&<Card>
             <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>📊 Gelir Kullanımı</div>
-            {[["Kira",livingForPlan,"#8e44ad"],["Borç Ödemeleri",cascadeMonthlyTotal,"#e74c3c"],["Giderler",totalExpenses,"#3498db"],["Net Kalan",Math.max(0,cascadeFreeIncome),"#27ae60"]].map(([l,v,c])=>{
+            {[["Kira",cascadeKira,"#8e44ad"],["Borç Ödemeleri",cascadeMonthlyTotal,"#e74c3c"],["Giderler",totalExpenses,"#3498db"],["Net Kalan",Math.max(0,cascadeFreeIncome),"#27ae60"]].map(([l,v,c])=>{
               const pct=Math.round((v/totalIncome)*100);
               return <div key={l} style={{marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
