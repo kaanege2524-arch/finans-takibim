@@ -477,6 +477,14 @@ function App(){
   const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
   const [planLiving,setPlanLiving]=useLS("ft_planliving3", 27000);
   const [paidAlerts,setPaidAlerts]=useLS("ft_paidalerts",{});
+  // Yaşam giderleri — kira + diğer aylık zorunlu giderler
+  const [livingItems,setLivingItems]=useLS("ft_livingitems",[
+    {id:1,label:"Kira",amount:27000,icon:"🏠",fundedBy:[],note:""},
+  ]);
+  const [showLivingForm,setShowLivingForm]=useState(false);
+  const [editLivingId,setEditLivingId]=useState(null);
+  const [lForm,setLForm]=useState({label:"",amount:"",icon:"🏠",fundedBy:[],note:""});
+  const blankLForm={label:"",amount:"",icon:"🏠",fundedBy:[],note:""};
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
@@ -618,9 +626,10 @@ function App(){
     if(diffDays<0||diffDays>14) return null;
     const amt = d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly;
     const icon = d.type==="kredi_karti"?"💳":d.type==="kmh"?"🏦":"📋";
+    const typeLabel = d.type==="kredi_karti"?"KK":d.type==="kmh"?"KMH":"Kredi";
     const label = d.name.replace("K.Kartı - ","").replace("KMH - ","");
     const isPaid = !!paidAlerts[d.id+"_"+curMonth];
-    return {id:d.id,name:label,fullName:d.name,type:d.type,diffDays,payDate,amt,icon,isPaid};
+    return {id:d.id,name:label,fullName:d.name,type:d.type,typeLabel,diffDays,payDate,amt,icon,isPaid};
   }).filter(Boolean).sort((a,b)=>a.isPaid-b.isPaid||a.diffDays-b.diffDays);
   // Geriye uyumluluk için cardAlerts da tut
   const cardAlerts=[];
@@ -642,7 +651,12 @@ function App(){
   const plan=useMemo(()=>masterPlan(),[debts]);
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
-  const livingForPlan = (planLiving >= 1000) ? planLiving : estLiving;
+  // livingForPlan: livingItems toplamı varsa onu kullan, yoksa planLiving
+  const livingForPlan = livingItems.length > 0
+    ? livingItems.reduce((s,i) => s + (i.amount||0), 0)
+    : ((planLiving >= 1000) ? planLiving : estLiving);
+  // planLiving'i de güncel tut (geriye uyumluluk)
+  // (cascade zaten livingForPlan kullanıyor)
   const cascadePlans=useMemo(()=>({
     avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp),
     snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
@@ -2161,13 +2175,83 @@ Türkçe, samimi, max 350 kelime.`;
             </div>
           </Card>}
 
-          {/* Kira ayarı — kompakt */}
-          <div style={{display:"flex",alignItems:"center",gap:8,background:"#fff",border:"1.5px solid #eee",borderRadius:10,padding:"8px 12px",marginBottom:8}}>
-            <span style={{fontSize:12,fontWeight:700,flex:1}}>🏠 Kira</span>
-            <input type="number" value={planLiving} onChange={e=>setPlanLiving(Number(e.target.value))}
-              style={{width:100,border:"1.5px solid #ddd",borderRadius:8,padding:"5px 8px",fontSize:13,textAlign:"right",fontFamily:"'Sora',sans-serif"}}/>
-            <span style={{fontSize:11,color:"#888"}}>₺</span>
-          </div>
+          {/* Yaşam Giderleri Paneli */}
+          <Card style={{marginBottom:8,padding:"12px 14px"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div>
+                <span style={{fontSize:13,fontWeight:700}}>🏠 Yaşam Giderleri</span>
+                <span style={{fontSize:12,fontWeight:800,color:"#8e44ad",marginLeft:8}}>{fmt(livingForPlan)}</span>
+              </div>
+              <button onClick={()=>{setLForm(blankLForm);setEditLivingId(null);setShowLivingForm(p=>!p);}}
+                style={{...btnS("#8e44ad"),width:"auto",padding:"5px 11px",fontSize:11,margin:0}}>+ Ekle</button>
+            </div>
+
+            {/* Form */}
+            {showLivingForm&&<div style={{background:"#f9f0ff",border:"1.5px dashed #8e44ad",borderRadius:10,padding:"12px",marginBottom:10}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <input style={{...inp,marginBottom:0}} placeholder="Ad (örn: Kira)" value={lForm.label}
+                  onChange={e=>setLForm({...lForm,label:e.target.value})}/>
+                <input style={{...inp,marginBottom:0}} type="number" placeholder="Tutar ₺" value={lForm.amount}
+                  onChange={e=>setLForm({...lForm,amount:e.target.value})}/>
+              </div>
+              <div style={{marginTop:8,marginBottom:8}}>
+                <div style={{fontSize:11,color:"#8e44ad",fontWeight:600,marginBottom:5}}>💡 Bu gider hangi gelirden karşılanıyor? (isteğe bağlı)</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {[{label:"💰 Maaş",key:"maas"},{label:"🏠 Kira Geliri",key:"kira_geliri"},{label:"📚 Ek Ders",key:"ek_ders"},...incomes.map(i=>({label:i.label,key:"inc_"+i.id}))].filter((v,i,a)=>a.findIndex(x=>x.key===v.key)===i).map(src=>{
+                    const sel=(lForm.fundedBy||[]).includes(src.key);
+                    return <button key={src.key} onClick={()=>{
+                      const fb=lForm.fundedBy||[];
+                      setLForm({...lForm,fundedBy:sel?fb.filter(x=>x!==src.key):[...fb,src.key]});
+                    }} style={{padding:"4px 10px",fontSize:11,borderRadius:20,
+                      border:`1.5px solid ${sel?"#8e44ad":"#ddd"}`,
+                      background:sel?"#8e44ad":"#fff",color:sel?"#fff":"#666",
+                      cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
+                      {src.label}
+                    </button>;
+                  })}
+                </div>
+              </div>
+              <input style={{...inp,marginBottom:8}} placeholder="Not (isteğe bağlı)" value={lForm.note}
+                onChange={e=>setLForm({...lForm,note:e.target.value})}/>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={()=>{
+                  if(!lForm.label||!lForm.amount)return;
+                  const item={id:editLivingId||Date.now(),...lForm,amount:Number(lForm.amount)};
+                  if(editLivingId){setLivingItems(p=>p.map(x=>x.id===editLivingId?item:x));}
+                  else{setLivingItems(p=>[...p,item]);}
+                  setLForm(blankLForm);setEditLivingId(null);setShowLivingForm(false);
+                  showToast("✅ Yaşam gideri kaydedildi");
+                }} style={{...btnS("#8e44ad"),margin:0,fontSize:12}}>💾 Kaydet</button>
+                <button onClick={()=>{setShowLivingForm(false);setEditLivingId(null);setLForm(blankLForm);}}
+                  style={{...btnP,background:"#eee",color:"#555",margin:0,fontSize:12}}>İptal</button>
+              </div>
+            </div>}
+
+            {/* Liste */}
+            {livingItems.map(item=>(
+              <div key={item.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#faf5ff",borderRadius:10,marginBottom:6,border:"1px solid #e8d5f5"}}>
+                <span style={{fontSize:16}}>{item.icon||"🏠"}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:700}}>{item.label}</div>
+                  {item.fundedBy?.length>0&&<div style={{fontSize:10,color:"#8e44ad"}}>
+                    Kaynak: {item.fundedBy.map(k=>k==="maas"?"Maaş":k==="kira_geliri"?"Kira Geliri":k==="ek_ders"?"Ek Ders":incomes.find(i=>"inc_"+i.id===k)?.label||k).join(" + ")}
+                  </div>}
+                  {item.note&&<div style={{fontSize:10,color:"#aaa"}}>{item.note}</div>}
+                </div>
+                <div style={{fontSize:14,fontWeight:800,color:"#8e44ad"}}>{fmt(item.amount)}</div>
+                <div style={{display:"flex",gap:4}}>
+                  <button onClick={()=>{setLForm({...item,amount:String(item.amount)});setEditLivingId(item.id);setShowLivingForm(true);}}
+                    style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:7,padding:"3px 7px",fontSize:11,cursor:"pointer"}}>✏️</button>
+                  <button onClick={()=>{if(window.confirm("Sil?"))setLivingItems(p=>p.filter(x=>x.id!==item.id));}}
+                    style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:7,padding:"3px 7px",fontSize:11,cursor:"pointer"}}>🗑</button>
+                </div>
+              </div>
+            ))}
+            <div style={{borderTop:"1px solid #eee",paddingTop:8,display:"flex",justifyContent:"space-between"}}>
+              <span style={{fontSize:11,color:"#888"}}>Toplam yaşam gideri</span>
+              <span style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(livingForPlan)}</span>
+            </div>
+          </Card>
 
           {/* Cascade takvim */}
           <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:8}}>🗓 Aylık Takvim</div>
@@ -2280,7 +2364,7 @@ Türkçe, samimi, max 350 kelime.`;
               {paymentAlerts.map(a=>(
                 <div key={a.id} style={{background:a.diffDays<=2?"#fff0f0":a.diffDays<=7?"#fffbf0":"#f0f8ff",border:`1.5px solid ${a.diffDays<=2?"#e74c3c":a.diffDays<=7?"#f39c12":"#3498db"}`,borderRadius:12,padding:"10px 13px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
-                    <div style={{fontSize:12,fontWeight:700,color:a.diffDays<=2?"#c0392b":a.diffDays<=7?"#e67e22":"#2980b9"}}>{a.icon} {a.name}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:a.diffDays<=2?"#c0392b":a.diffDays<=7?"#e67e22":"#2980b9",display:"flex",alignItems:"center",gap:5}}>{a.icon} {a.name} <span style={{fontSize:9,background:a.type==="kredi_karti"?"#fdf3e8":a.type==="kmh"?"#f3e8fd":"#e8f4fd",color:a.type==="kredi_karti"?"#e67e22":a.type==="kmh"?"#8e44ad":"#2980b9",borderRadius:20,padding:"1px 6px",fontWeight:700}}>{a.typeLabel}</span></div>
                     <div style={{fontSize:11,color:"#888"}}>{a.diffDays===0?"Bugün!":a.diffDays===1?"Yarın!":a.diffDays+" gün kaldı"} · {fmt(a.amt)}</div>
                   </div>
                   <button onClick={()=>{setChatInput(`${a.fullName} için ${a.diffDays===0?"bugün":a.diffDays+" gün içinde"} ${fmt(a.amt)} ödeme var. Bu konuda ne önerirsin?`);setTimeout(()=>chatInputRef.current?.focus(),50);}} style={{background:a.diffDays<=2?"#c0392b":a.diffDays<=7?"#e67e22":"#3498db",color:"#fff",border:"none",borderRadius:8,padding:"5px 9px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>AI'a Sor</button>
