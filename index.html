@@ -789,12 +789,28 @@ function App(){
   const API_KEY="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";
 
   function buildFinContext(){
+    const plan = cascadePlans?.[selectedStrategy] || [];
+    const kapanmaAylari = debts.map(d=>{
+      const lastMonth = plan.filter(m=>m.payments.find(p=>p.id===d.id&&p.payment>0)).slice(-1)[0];
+      return lastMonth ? `${d.name} → ${lastMonth.label}` : null;
+    }).filter(Boolean);
+    const surplusAylari = plan.filter(m=>m.surplus>5000).map(m=>`${m.label}: ${fmt(m.surplus)} serbest`);
     return `[FİNANSAL DURUM - ${new Date().toLocaleDateString('tr-TR')}]
 Gelir: ${fmt(totalIncome)} (Maaş: ${fmt(salary)}${thisMonthExtra>0?` + Ek: ${fmt(thisMonthExtra)}`:""}))
-Toplam Borç: ${fmt(totalDebt)} | Aylık Ödeme: ${fmt(totalMonthly)} (%${debtRatio} gelir)
-Bu Ay Gider: ${fmt(totalExpenses)} | Net Kalan: ${fmt(freeIncome)}
-Borçlar:
-${debts.map(d=>`  • ${d.name} [${d.type==="kredi"?"Kredi":d.type==="kredi_karti"?"K.Kartı":"KMH"}]: ${fmt(d.remaining)} kalan, %${d.rate} faiz, aylık ${fmt(d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly)}`).join("\n")}
+Kira: ${fmt(livingForPlan)} | Borç/Gelir Oranı: %${debtRatio}
+Toplam Borç: ${fmt(totalDebt)} | Bu Ay Ödeme: ${fmt(cascadeMonthlyTotal)}
+Bu Ay Gider: ${fmt(totalExpenses)} | Net Kalan: ${fmt(cascadeFreeIncome)}
+Seçili Strateji: ${selectedStrategy.toUpperCase()}
+
+BORÇLAR:
+${debts.map(d=>`  • ${d.name} [${d.type==="kredi"?"Kredi":d.type==="kredi_karti"?"K.Kartı":"KMH"}]: ${fmt(d.remaining)} kalan, %${d.rate} faiz`).join("\n")}
+
+KAPANMA TAHMİNİ (${selectedStrategy}):
+${kapanmaAylari.join("\n")}
+
+SERBEST NAKİT OLACAK AYLAR:
+${surplusAylari.slice(0,3).join("\n") || "Yakın vadede serbest nakit yok"}
+
 ${activeRecurring.length>0?`Sabit Giderler: ${activeRecurring.map(r=>`${r.category} ${fmt(r.amount)}`).join(", ")}`:""}`; 
   }
 
@@ -1912,7 +1928,14 @@ Türkçe, samimi, max 350 kelime.`;
           {chatMessages.length===0&&<div style={{marginBottom:10}}>
             <div style={{fontSize:11,color:"#888",marginBottom:8}}>💡 Hızlı sorular:</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {["Hangi borcumu önce kapatmalıyım?","Bu ay ne kadar tasarruf edebilirim?","Finansal durumumu değerlendirir misin?","Borç/gelir oranım sağlıklı mı?","KMH'larımı kapatmak ne kadar sürer?","Bu ay ödeme öncelik sırası ne olmalı?"].map((q,i)=>(
+              {[
+                "Borç kapatma planımı yorumla, strateji değiştirmeli miyim?",
+                `${selectedStrategy} stratejisi ile ne zaman borçsuz olacağım?`,
+                "Bu ay en kritik ödeme hangisi, neden?",
+                "Serbest nakit olduğunda ne yapmalıyım?",
+                "KMH faizleri beni ne kadar etkiliyor?",
+                "Harcamalarımda tasarruf edebileceğim alan var mı?",
+              ].map((q,i)=>(
                 <button key={i} onClick={()=>{setChatInput(q);setTimeout(()=>{chatInputRef.current?.focus();},50);}}
                   style={{background:"#fff",border:"1.5px solid #e0e0e0",borderRadius:20,padding:"6px 12px",fontSize:11,color:"#444",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
                   {q}
@@ -1964,8 +1987,48 @@ Türkçe, samimi, max 350 kelime.`;
             ))}
           </div>
 
+          {/* AI Aksiyon Butonları */}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginTop:10}}>
+            <button onClick={()=>{
+              const plan=cascadePlans?.[selectedStrategy]||[];
+              const kapanma=debts.map(d=>{const lm=plan.filter(m=>m.payments.find(p=>p.id===d.id&&p.payment>0)).slice(-1)[0];return lm?`${d.name}: ${lm.label}`:null;}).filter(Boolean);
+              setChatInput(`Şu anki ${selectedStrategy} stratejim için detaylı analiz yap. Kapanma tarihleri: ${kapanma.join(", ")}. Bu strateji benim için doğru mu, alternatif önerin var mı?`);
+              setTimeout(()=>{chatInputRef.current?.focus();},50);
+            }} style={{...btnS("#2980b9"),margin:0,fontSize:11,padding:"10px 8px"}}>
+              🎯 Plan Analizi Yap
+            </button>
+            <button onClick={()=>{
+              const thisExp=allExpenses.filter(e=>e.date.slice(0,7)===curMonth);
+              const prevDate=new Date(new Date().setMonth(new Date().getMonth()-1));
+              const prevKey=`${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,"0")}`;
+              const prevExp=allExpenses.filter(e=>e.date.slice(0,7)===prevKey);
+              const thisCats={};thisExp.forEach(e=>{thisCats[e.category]=(thisCats[e.category]||0)+e.amount;});
+              const prevCats={};prevExp.forEach(e=>{prevCats[e.category]=(prevCats[e.category]||0)+e.amount;});
+              const karsilastir=Object.keys({...thisCats,...prevCats}).map(k=>`${k}: geçen ${fmt(prevCats[k]||0)} → bu ay ${fmt(thisCats[k]||0)}`).join(", ");
+              setChatInput(`Harcamalarımı analiz et. Geçen aya göre karşılaştırma: ${karsilastir}. Anomali veya dikkat edilmesi gereken değişiklik var mı?`);
+              setTimeout(()=>{chatInputRef.current?.focus();},50);
+            }} style={{...btnS("#27ae60"),margin:0,fontSize:11,padding:"10px 8px"}}>
+              🔍 Harcama Analizi
+            </button>
+            <button onClick={()=>{
+              const surplusMonths=((cascadePlans?.[selectedStrategy])||[]).filter(m=>m.surplus>3000).slice(0,3);
+              setChatInput(`Cascade planıma göre serbest nakit olacak aylar: ${surplusMonths.map(m=>`${m.label} (${fmt(m.surplus)})`).join(", ")}. Bu nakitleri nasıl değerlendirmeliyim? Erken borç kapatma mı, acil fon mu, yatırım mı?`);
+              setTimeout(()=>{chatInputRef.current?.focus();},50);
+            }} style={{...btnS("#8e44ad"),margin:0,fontSize:11,padding:"10px 8px"}}>
+              💰 Nakit Strateji
+            </button>
+            <button onClick={()=>{
+              const topKMH=debts.filter(d=>d.type==="kmh").sort((a,b)=>b.remaining-a.remaining)[0];
+              const topKK=debts.filter(d=>d.type==="kredi_karti").sort((a,b)=>b.remaining-a.remaining)[0];
+              setChatInput(`KMH ve kredi kartı faiz yükümü analiz et. En büyük KMH: ${topKMH?.name} ${fmt(topKMH?.remaining||0)} (%${topKMH?.rate}). En büyük KK: ${topKK?.name} ${fmt(topKK?.remaining||0)} (%${topKK?.rate}). Aylık toplam faiz maliyetim ne kadar ve bunu azaltmak için ne yapabilirim?`);
+              setTimeout(()=>{chatInputRef.current?.focus();},50);
+            }} style={{...btnS("#e67e22"),margin:0,fontSize:11,padding:"10px 8px"}}>
+              📊 Faiz Analizi
+            </button>
+          </div>
+
           {/* Aylık AI Raporu */}
-          <Card style={{marginTop:10,border:"1.5px solid #c5cae9",background:"#f8f9ff"}}>
+          <Card style={{marginTop:8,border:"1.5px solid #c5cae9",background:"#f8f9ff"}}>
             <div style={{fontSize:13,fontWeight:700,color:"#1a237e",marginBottom:6}}>📋 Aylık AI Raporu</div>
             <div style={{fontSize:11,color:"#888",marginBottom:10}}>Tüm verilerini AI analiz eder, özet rapor çıkarır.</div>
             <button onClick={getMonthlyReport} disabled={reportLoading} style={{...btnP,background:"#3949ab",opacity:reportLoading?.7:1,fontSize:13,padding:"11px",marginBottom:0}}>
