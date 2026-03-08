@@ -734,7 +734,9 @@ function App(){
       exps.push({
         id: Date.now()+i,
         category, icon, amount: installAmt,
-        date: dateStr, payMethod:"kredi_karti",
+        date: dateStr,
+        purchaseDate: purchaseDateStr || new Date().toISOString().slice(0,10),
+        payMethod:"kredi_karti",
         cardId: card.id, installments: inst,
         installmentAmt: installAmt, installmentNo: i+1,
         totalInstallments: inst,
@@ -747,6 +749,11 @@ function App(){
 
 
   // ── SES İLE HARCAMA ──────────────────────────────────────────────────────
+  const [toast, setToast] = useState(null);
+  function showToast(msg, color="#27ae60"){
+    setToast({msg, color});
+    setTimeout(()=>setToast(null), 3000);
+  }
   const [voiceActive, setVoiceActive] = useState(false);
   const [voiceText, setVoiceText]     = useState("");
   const [voiceResult, setVoiceResult] = useState(null);
@@ -878,6 +885,8 @@ function App(){
     }
     setQuickForm(prev=>({...prev,amount:"",note:"",installments:1}));
     setShowQuickExp(false);
+    const pm = quickForm.payMethod==="kredi_karti"?"💳 Karta":quickForm.payMethod==="kmh"?"🏦 KMH'ye":"💵 Nakite";
+    showToast(`✅ ${pm} kaydedildi: ${new Intl.NumberFormat("tr-TR").format(Number(quickForm.amount))}₺`);
   }
 
   function applySmart(){
@@ -1058,7 +1067,8 @@ Türkçe, samimi, max 350 kelime.`;
       ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
       .slide-in{animation:si .25s ease}
       @keyframes si{from{transform:translateY(14px);opacity:0}to{transform:translateY(0);opacity:1}}
-      .pulse{animation:pu 2s infinite}@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
+      .pulse{animation:pu 2s infinite}@keyframes fadeInUp{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes pu{0%,100%{opacity:1}50%{opacity:.5}}
       .hover-row:hover{background:#fafafa!important}
       input[type=number]::-webkit-inner-spin-button{opacity:.4}
       select{appearance:auto}
@@ -1202,6 +1212,11 @@ Türkçe, samimi, max 350 kelime.`;
               ✅ Kaydet
             </button>
           </div>
+        </div>}
+
+        {/* Toast bildirimi */}
+        {toast&&<div style={{position:"fixed",bottom:100,left:"50%",transform:"translateX(-50%)",zIndex:999,background:toast.color,color:"#fff",borderRadius:12,padding:"12px 20px",fontSize:13,fontWeight:700,boxShadow:"0 4px 20px rgba(0,0,0,.3)",fontFamily:"'Sora',sans-serif",whiteSpace:"nowrap",animation:"fadeInUp .3s ease"}}>
+          {toast.msg}
         </div>}
 
         {/* Kart uyarıları */}
@@ -1743,7 +1758,11 @@ Türkçe, samimi, max 350 kelime.`;
           </Card>}
 
           {(() => {
-            const filteredExp = [...allExpenses].filter(e=>e.date.slice(0,7)===selectedMonth).sort((a,b)=>b.date.localeCompare(a.date));
+            const filteredExp = [...allExpenses].filter(e=>{
+              // Kart taksiti: alışveriş tarihi bu aysa göster (ödeme tarihi farklı olabilir)
+              const checkDate = (e.payMethod==="kredi_karti" && e.purchaseDate) ? e.purchaseDate : e.date;
+              return checkDate.slice(0,7)===selectedMonth;
+            }).sort((a,b)=>b.date.localeCompare(a.date));
             const monthTotal = filteredExp.reduce((s,e)=>s+(e.isInstallment?(e.installmentAmt||Math.round(e.amount/(e.installments||1))):e.amount),0);
             const CHART_COLORS = ["#e74c3c","#e67e22","#f1c40f","#2ecc71","#1abc9c","#3498db","#9b59b6","#e91e63","#ff5722","#607d8b","#795548","#00bcd4"];
             const catData = CATS.map((c,ci)=>{
