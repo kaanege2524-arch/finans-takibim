@@ -463,6 +463,8 @@ function App(){
   const [expandedMonths,setExpandedMonths]=useState(new Set());
   const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
   const [planLiving,setPlanLiving]=useLS("ft_planliving", 27000);
+  // localStorage'daki eski düşük değeri düzelt (önceki session 15000 kaydetmiş olabilir)
+  React.useEffect(()=>{ if(!planLiving || planLiving < 1000) setPlanLiving(27000); },[]);
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
@@ -614,7 +616,7 @@ function App(){
   const plan=useMemo(()=>masterPlan(),[debts]);
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
-  const livingForPlan = planLiving || estLiving;
+  const livingForPlan = (planLiving >= 1000) ? planLiving : estLiving;
   const cascadePlans=useMemo(()=>({
     avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp),
     snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
