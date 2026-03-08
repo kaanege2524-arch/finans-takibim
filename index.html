@@ -843,30 +843,39 @@ function App(){
   function saveQuickExp(){
     if(!quickForm.amount||!quickForm.category)return;
     const catObj=CATS.find(c=>c.name===quickForm.category);
-    const today=new Date();
-    const todayStr=today.toISOString().slice(0,10);
+    const todayStr=new Date().toISOString().slice(0,10);
     const inst=Number(quickForm.installments)||1;
     const amt=Number(quickForm.amount);
-    const installAmt=Math.round(amt/inst);
+    // ID karşılaştırmasını string ve number her ikisine karşı güvenli yap
+    const matchId=(a,b)=>String(a)===String(b);
 
-    if(quickForm.payMethod==="kredi_karti"&&quickForm.cardId){
-      const card=debts.find(d=>d.id===Number(quickForm.cardId));
-      if(!card) return;
-      const newExps=buildCardExpenses(card, quickForm.category, catObj?.icon||"📌", amt, inst, todayStr);
-      setDebts(p=>p.map(d=>d.id===card.id?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
-      setExpenses(p=>[...p,...newExps]);
-    } else if(quickForm.payMethod==="kmh"&&quickForm.kmhId){
-      const newExp={id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
-        icon:catObj?.icon||"📌",payMethod:"kmh",kmhId:Number(quickForm.kmhId),
-        installments:1,installmentAmt:amt,note:quickForm.note||""};
-      setDebts(p=>p.map(d=>d.id===Number(quickForm.kmhId)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
-      setExpenses(p=>[...p,newExp]);
+    if(quickForm.payMethod==="kredi_karti"){
+      // Kart seçilmemişse ilk kartı otomatik al
+      const cardId=quickForm.cardId||String(creditCards[0]?.id||"");
+      const card=debts.find(d=>matchId(d.id,cardId));
+      if(!card){
+        // Kart bulunamadı, nakit olarak kaydet
+        setExpenses(p=>[...p,{id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
+          icon:catObj?.icon||"📌",payMethod:"nakit",installments:1,installmentAmt:amt,note:quickForm.note||""}]);
+      } else {
+        const newExps=buildCardExpenses(card, quickForm.category, catObj?.icon||"📌", amt, inst, todayStr);
+        setDebts(p=>p.map(d=>matchId(d.id,card.id)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
+        setExpenses(p=>[...p,...newExps]);
+      }
+    } else if(quickForm.payMethod==="kmh"){
+      const kmhId=quickForm.kmhId||String(debts.find(d=>d.type==="kmh")?.id||"");
+      const kmh=debts.find(d=>matchId(d.id,kmhId));
+      if(!kmh){
+        setExpenses(p=>[...p,{id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
+          icon:catObj?.icon||"📌",payMethod:"nakit",installments:1,installmentAmt:amt,note:quickForm.note||""}]);
+      } else {
+        setDebts(p=>p.map(d=>matchId(d.id,kmh.id)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
+        setExpenses(p=>[...p,{id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
+          icon:catObj?.icon||"📌",payMethod:"kmh",kmhId:kmh.id,installments:1,installmentAmt:amt,note:quickForm.note||""}]);
+      }
     } else {
-      const newExp={id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
-        icon:catObj?.icon||"📌",payMethod:quickForm.payMethod,
-        cardId:quickForm.cardId?Number(quickForm.cardId):null,
-        installments:1,installmentAmt:amt,note:quickForm.note||""};
-      setExpenses(p=>[...p,newExp]);
+      setExpenses(p=>[...p,{id:Date.now(),category:quickForm.category,amount:amt,date:todayStr,
+        icon:catObj?.icon||"📌",payMethod:"nakit",installments:1,installmentAmt:amt,note:quickForm.note||""}]);
     }
     setQuickForm(prev=>({...prev,amount:"",note:"",installments:1}));
     setShowQuickExp(false);
