@@ -692,9 +692,18 @@ function App(){
     }
     setEForm(blankExp);setShowAddExp(false);
   }
-  function startEditExp(e){
-    setEForm({category:e.category,amount:e.amount,date:e.date,payMethod:e.payMethod,cardId:e.cardId||"",installments:e.installments||1});
-    setEditExpId(e.id);setShowAddExp(true);window.scrollTo({top:0,behavior:'smooth'});
+  function startEditExp(exp){
+    setQuickForm({
+      category: exp.category,
+      amount: String(exp.amount),
+      payMethod: exp.payMethod||"nakit",
+      cardId: exp.cardId ? String(exp.cardId) : "",
+      kmhId: exp.kmhId ? String(exp.kmhId) : "",
+      installments: exp.installments||1,
+      note: exp.note||"",
+    });
+    setEditExpId(exp.id);
+    setShowQuickExp(true);
   }
   function deleteExp(id){if(window.confirm("Bu gideri silmek istiyor musun?"))setExpenses(p=>p.filter(e=>e.id!==id));}
 
@@ -849,6 +858,23 @@ function App(){
 
   function saveQuickExp(){
     if(!quickForm.amount||!quickForm.category)return;
+    // Düzenleme modu: mevcut kaydı güncelle
+    if(editExpId){
+      const catObj2=CATS.find(c=>c.name===quickForm.category);
+      setExpenses(p=>p.map(e=>e.id===editExpId?{...e,
+        category:quickForm.category,
+        amount:Number(quickForm.amount),
+        payMethod:quickForm.payMethod,
+        cardId:quickForm.cardId?Number(quickForm.cardId):null,
+        note:quickForm.note||"",
+        icon:catObj2?.icon||e.icon,
+      }:e));
+      setEditExpId(null);
+      setQuickForm(prev=>({...prev,amount:"",note:"",installments:1}));
+      setShowQuickExp(false);
+      showToast("✅ Gider güncellendi");
+      return;
+    }
     const catObj=CATS.find(c=>c.name===quickForm.category);
     const todayStr=new Date().toISOString().slice(0,10);
     const inst=Number(quickForm.installments)||1;
@@ -1125,11 +1151,11 @@ Türkçe, samimi, max 350 kelime.`;
           </div>
         </div>}
 
-        {showQuickExp&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowQuickExp(false);}}>
+        {showQuickExp&&<div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",zIndex:100,display:"flex",alignItems:"flex-end",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget){setShowQuickExp(false);setEditExpId(null);}}}>
           <div style={{background:"#fff",borderRadius:"20px 20px 0 0",padding:"20px 16px 32px",width:"100%",maxWidth:480,boxSizing:"border-box"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-              <div style={{fontSize:15,fontWeight:800,color:"#1a1a2e"}}>⚡ Hızlı Harcama Ekle</div>
-              <button onClick={()=>setShowQuickExp(false)} style={{background:"#f0f0f0",border:"none",borderRadius:"50%",width:28,height:28,fontSize:16,cursor:"pointer"}}>×</button>
+              <div style={{fontSize:15,fontWeight:800,color:"#1a1a2e"}}>{editExpId?"✏️ Gideri Düzenle":"⚡ Hızlı Harcama Ekle"}</div>
+              <button onClick={()=>{setShowQuickExp(false);setEditExpId(null);}} style={{background:"#f0f0f0",border:"none",borderRadius:"50%",width:28,height:28,fontSize:16,cursor:"pointer"}}>×</button>
             </div>
 
             {/* Kategori */}
@@ -1209,7 +1235,7 @@ Türkçe, samimi, max 350 kelime.`;
             <button onClick={saveQuickExp}
               disabled={!quickForm.amount||!quickForm.category}
               style={{...btnP,fontSize:15,padding:"14px",opacity:(!quickForm.amount||!quickForm.category)?.5:1}}>
-              ✅ Kaydet
+              {editExpId?"💾 Güncelle":"✅ Kaydet"}
             </button>
           </div>
         </div>}
@@ -1851,8 +1877,8 @@ Türkçe, samimi, max 350 kelime.`;
                         {e.isInstallment&&<div style={{fontSize:10,color:"#888"}}>{e.installmentNo}/{e.totalInstallments}. taksit · Toplam {fmt(e.installmentAmt*e.totalInstallments)}</div>}
                       </div>
                       {!e.isRecurring&&<div style={{display:"flex",gap:5}}>
-                        <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontWeight:600}}>✏️</button>
-                        <button onClick={()=>deleteExp(e.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer"}}>🗑</button>
+                        <button onClick={()=>startEditExp(e)} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",fontWeight:600,opacity:1}}>✏️</button>
+                        <button onClick={()=>deleteExp(e.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:8,padding:"3px 9px",fontSize:11,cursor:"pointer",opacity:1}}>🗑</button>
                       </div>}
                     </div>
                   </div>
