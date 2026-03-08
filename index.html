@@ -567,13 +567,22 @@ function App(){
     setCatForm({name:"",icon:"📌"});setShowAddCat(false);
   }
 
-  const thisMonthExtra=incomes.filter(e=>e.recurring||e.date.slice(0,7)===curMonth).reduce((s,e)=>s+e.amount,0);
-  const totalIncome=salary+thisMonthExtra;
-  const totalDebt=debts.reduce((s,d)=>s+d.remaining,0);
-  const totalMonthly=debts.reduce((s,d)=>s+(d.type!=="kredi"&&d.userPayment?d.userPayment:d.monthly),0);
-  const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+(e.installments>1?(e.installmentAmt||Math.round(e.amount/e.installments)):e.amount),0);
-  const freeIncome=totalIncome-totalMonthly-totalExpenses;
-  const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
+  const curMonthIdx = new Date().getMonth(); // 0=Ocak
+  const thisMonthExtra = incomes.filter(e => {
+    if(!e.recurring && e.date?.slice(0,7) !== curMonth) return false;
+    const skip = e.skipMonths || ((e.label||"").toLowerCase().includes("ek ders") ? [6,7,8] : []);
+    return !skip.includes(curMonthIdx);
+  }).reduce((s,e) => s + e.amount, 0);
+  const totalIncome = salary + thisMonthExtra;
+  const totalDebt = debts.reduce((s,d) => s + d.remaining, 0);
+  // Borç ödemeleri: bu ayın gerçek ödemeleri (kartlı harcama taksitleri dahil)
+  const totalMonthly = debts.reduce((s,d) => s + (d.type !== "kredi" && d.userPayment ? d.userPayment : d.monthly), 0);
+  // Giderler: bu ay tarihli nakit/kart harcamaları (kart taksit = o ayın payı)
+  const totalExpenses = allExpenses
+    .filter(e => e.date.slice(0,7) === curMonth && e.payMethod !== "kmh")
+    .reduce((s,e) => s + (e.isInstallment ? (e.installmentAmt || Math.round(e.amount/(e.installments||1))) : e.amount), 0);
+  const freeIncome = totalIncome - totalMonthly - totalExpenses;
+  const debtRatio = ((totalMonthly / totalIncome) * 100).toFixed(0);
   const estLiving=27000; // Varsayılan kira
   const smart=calcSmart(debts,totalIncome,estLiving);
 
@@ -1453,8 +1462,7 @@ Türkçe, samimi, max 350 kelime.`;
               </div>
             </div>
             <div style={{display:"flex",gap:6,justifyContent:"flex-end"}}>
-              <button onClick={()=>setShowAddRecurring(!showAddRecurring)} style={{...btnS("#8e44ad"),width:"auto",padding:"6px 10px",fontSize:11}}>🔄 Sabit</button>
-              <button onClick={()=>setShowAddExp(!showAddExp)} style={{...btnP,width:"auto",padding:"6px 11px",fontSize:11}}>+ Ekle</button>
+              <button onClick={()=>setShowAddRecurring(!showAddRecurring)} style={{...btnS("#8e44ad"),width:"auto",padding:"6px 10px",fontSize:11}}>🔄 Sabit Gider</button>
             </div>
           </div>
 
@@ -1574,73 +1582,68 @@ Türkçe, samimi, max 350 kelime.`;
             })}
           </Card>}
 
-          {showAddExp&&<Card style={{border:"2px dashed #e0e0e0"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>{editExpId?"✏️ Gideri Düzenle":"➕ Yeni Gider"}</div>
-            <select style={inp} value={eForm.category} onChange={e=>setEForm({...eForm,category:e.target.value})}>
-              {CATS.map(c=><option key={c.name} value={c.name}>{c.icon} {c.name}</option>)}
-            </select>
-            <input style={inp} type="number" placeholder="Tutar (₺)" value={eForm.amount} onChange={e=>setEForm({...eForm,amount:e.target.value})}/>
-            <input style={inp} type="date" value={eForm.date} onChange={e=>setEForm({...eForm,date:e.target.value})}/>
-
-            {/* Ödeme yöntemi */}
-            <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>💳 Ödeme Yöntemi</div>
-            <div style={{display:"flex",gap:6,marginBottom:8}}>
-              {[["nakit","💵 Nakit"],["kredi_karti","💳 Kart"],["kmh","🏦 KMH"]].map(([v,l])=>(
-                <button key={v} onClick={()=>setEForm({...eForm,payMethod:v,cardId:"",kmhId:"",installments:1})} style={{flex:1,padding:"8px",border:`2px solid ${eForm.payMethod===v?"#c0392b":"#e0e0e0"}`,borderRadius:10,background:eForm.payMethod===v?"#fdf0f0":"#fff",color:eForm.payMethod===v?"#c0392b":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
-                  {l}
-                </button>
-              ))}
-            </div>
-
-            {eForm.payMethod==="kmh"&&<>
-              <div style={{fontSize:11,color:"#888",marginBottom:4,fontWeight:600}}>Hangi KMH?</div>
-              <select style={inp} value={eForm.kmhId||""} onChange={e=>setEForm({...eForm,kmhId:e.target.value})}>
-                <option value="">KMH seç...</option>
-                {debts.filter(d=>d.type==="kmh").map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-            </>}
-
-            {eForm.payMethod==="kredi_karti"&&<>
-              <select style={inp} value={eForm.cardId} onChange={e=>setEForm({...eForm,cardId:e.target.value})}>
-                <option value="">Kart seç...</option>
-                {creditCards.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <div style={{display:"flex",gap:8}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:11,color:"#888",marginBottom:4}}>Taksit</div>
-                  <select style={{...inp,marginBottom:0}} value={eForm.installments} onChange={e=>setEForm({...eForm,installments:Number(e.target.value)})}>
-                    {[1,2,3,4,6,9,12,18,24].map(n=><option key={n} value={n}>{n===1?"Tek Çekim":`${n} Taksit`}</option>)}
-                  </select>
-                </div>
-                {eForm.installments>1&&eForm.amount&&<div style={{flex:1}}>
-                  <div style={{fontSize:11,color:"#888",marginBottom:4}}>Aylık</div>
-                  <div style={{...inp,marginBottom:0,background:"#f5f5f5",color:"#27ae60",fontWeight:700,display:"flex",alignItems:"center"}}>
-                    {fmt(Math.round(Number(eForm.amount)/eForm.installments))}
-                  </div>
-                </div>}
-              </div>
-            </>}
-            <div style={{marginTop:8,display:"flex",gap:8}}>
-              <button onClick={saveExpense} style={btnP}>{editExpId?"Güncelle":"Kaydet"}</button>
-              <button onClick={()=>{setShowAddExp(false);setEditExpId(null);setEForm(blankExp);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
-            </div>
-          </Card>}
-
           {(() => {
             const filteredExp = [...allExpenses].filter(e=>e.date.slice(0,7)===selectedMonth).sort((a,b)=>b.date.localeCompare(a.date));
-            const filteredCatData = CATS.map(c=>({name:c.name,tutar:filteredExp.filter(e=>e.category===c.name).reduce((s,e)=>s+(e.isInstallment?(e.installmentAmt||e.amount):e.amount),0)})).filter(c=>c.tutar>0);
+            const monthTotal = filteredExp.reduce((s,e)=>s+(e.isInstallment?(e.installmentAmt||Math.round(e.amount/(e.installments||1))):e.amount),0);
+            const CHART_COLORS = ["#e74c3c","#e67e22","#f1c40f","#2ecc71","#1abc9c","#3498db","#9b59b6","#e91e63","#ff5722","#607d8b","#795548","#00bcd4"];
+            const catData = CATS.map((c,ci)=>{
+              const tutar = filteredExp.filter(e=>e.category===c.name).reduce((s,e)=>s+(e.isInstallment?(e.installmentAmt||Math.round(e.amount/(e.installments||1))):e.amount),0);
+              return {name:c.name, icon:c.icon, tutar, color:CHART_COLORS[ci%CHART_COLORS.length]};
+            }).filter(c=>c.tutar>0).sort((a,b)=>b.tutar-a.tutar);
+            const payBreak = [
+              {label:"💵 Nakit", tutar:filteredExp.filter(e=>e.payMethod==="nakit").reduce((s,e)=>s+e.amount,0), color:"#27ae60"},
+              {label:"💳 Kart", tutar:filteredExp.filter(e=>e.payMethod==="kredi_karti").reduce((s,e)=>s+(e.isInstallment?e.installmentAmt:e.amount),0), color:"#e67e22"},
+              {label:"🏦 KMH", tutar:filteredExp.filter(e=>e.payMethod==="kmh").reduce((s,e)=>s+e.amount,0), color:"#8e44ad"},
+            ].filter(p=>p.tutar>0);
             return <>
-              {filteredCatData.length>0&&<Card>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-                  <div style={{fontSize:13,fontWeight:700}}>Kategorilere Göre</div>
-                  <button onClick={()=>setShowAddCat(!showAddCat)} style={{fontSize:11,color:"#8e44ad",background:"#f3e8fd",border:"1px solid #d7bef5",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>+ Kategori</button>
+              {/* Özet grafik kartı */}
+              {catData.length>0&&<Card style={{marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:700}}>📊 Harcama Özeti</div>
+                    <div style={{fontSize:10,color:"#aaa"}}>{MONTHS[new Date(selectedMonth+"-01").getMonth()]} {new Date(selectedMonth+"-01").getFullYear()}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontSize:16,fontWeight:800,color:"#c0392b"}}>{fmt(monthTotal)}</div>
+                    <div style={{fontSize:9,color:"#aaa"}}>{filteredExp.length} işlem</div>
+                  </div>
                 </div>
-                <BarChartH data={filteredCatData.map(c=>({label:c.name,value:c.tutar}))} color="#c0392b"/>
+
+                {/* Yatay renk bar (toplam dağılım) */}
+                <div style={{display:"flex",height:10,borderRadius:8,overflow:"hidden",marginBottom:12,gap:1}}>
+                  {catData.map(c=>(
+                    <div key={c.name} style={{flex:c.tutar,background:c.color,transition:"flex .3s"}} title={`${c.name}: ${fmt(c.tutar)}`}/>
+                  ))}
+                </div>
+
+                {/* Kategori listesi */}
+                {catData.map(c=>(
+                  <div key={c.name} style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                    <div style={{width:10,height:10,borderRadius:3,background:c.color,flexShrink:0}}/>
+                    <div style={{fontSize:11,flex:1}}>{c.icon} {c.name}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:"#333"}}>{fmt(c.tutar)}</div>
+                    <div style={{fontSize:10,color:"#aaa",width:32,textAlign:"right"}}>{monthTotal>0?Math.round(c.tutar/monthTotal*100):0}%</div>
+                    <div style={{width:60,background:"#f0f0f0",borderRadius:4,height:6,overflow:"hidden"}}>
+                      <div style={{width:`${monthTotal>0?c.tutar/monthTotal*100:0}%`,height:"100%",background:c.color,borderRadius:4}}/>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Ödeme yöntemi kırılımı */}
+                {payBreak.length>0&&<div style={{marginTop:10,paddingTop:8,borderTop:"1px solid #f0f0f0",display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {payBreak.map(p=>(
+                    <div key={p.label} style={{flex:1,minWidth:80,background:"#f9f9f9",borderRadius:8,padding:"6px 8px",textAlign:"center"}}>
+                      <div style={{fontSize:10,color:p.color,fontWeight:700}}>{p.label}</div>
+                      <div style={{fontSize:12,fontWeight:800}}>{fmt(p.tutar)}</div>
+                    </div>
+                  ))}
+                </div>}
               </Card>}
-              {filteredExp.length===0&&<Card style={{textAlign:"center",padding:"24px",color:"#ccc"}}>
-                <div style={{fontSize:28,marginBottom:8}}>📭</div>
-                <div style={{fontSize:13}}>{MONTHS[new Date(selectedMonth+"-01").getMonth()]} ayına ait gider yok</div>
-                <div style={{fontSize:11,marginTop:4}}>+ Ekle butonu ile gider ekleyebilirsin</div>
+
+              {filteredExp.length===0&&<Card style={{textAlign:"center",padding:"28px",color:"#ccc"}}>
+                <div style={{fontSize:32,marginBottom:8}}>📭</div>
+                <div style={{fontSize:13}}>{MONTHS[new Date(selectedMonth+"-01").getMonth()]} ayına ait harcama yok</div>
+                <div style={{fontSize:11,marginTop:4,color:"#bbb"}}>Ana ekrandaki 💸 butonuyla harcama ekleyebilirsin</div>
               </Card>}
               {filteredExp.map(e=>{
                 const card=e.cardId?debts.find(d=>d.id===e.cardId):null;
