@@ -476,6 +476,7 @@ function App(){
   const [expandedMonths,setExpandedMonths]=useState(new Set());
   const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
   const [planLiving,setPlanLiving]=useLS("ft_planliving3", 27000);
+  const [paidAlerts,setPaidAlerts]=useLS("ft_paidalerts",{});
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
@@ -603,15 +604,26 @@ function App(){
 
   const creditCards=debts.filter(d=>d.type==="kredi_karti");
 
-  // Kredi kartları için bu ay son ödeme uyarısı
+  // Tüm borçlar için ödeme günü uyarısı (KMH + KK + Kredi)
   const today=new Date();
-  const cardAlerts=creditCards.map(c=>{
-    if(!c.sonOdemeGunu)return null;
-    const son=new Date(today.getFullYear(),today.getMonth(),c.sonOdemeGunu);
-    const diffDays=Math.ceil((son-today)/(1000*60*60*24));
-    if(diffDays>=0&&diffDays<=7)return{id:c.id,name:c.name,diffDays,son};
-    return null;
-  }).filter(Boolean);
+  const paymentAlerts=debts.filter(d=>d.remaining>0).map(d=>{
+    const payD = d.type==="kredi_karti" ? (d.sonOdemeGunu||d.payDay) : d.payDay;
+    if(!payD) return null;
+    let payDate = new Date(today.getFullYear(),today.getMonth(),payD);
+    // Eğer bu ay geçtiyse bir sonraki ayı göster
+    if(payDate < today && today.getDate() > payD) {
+      payDate = new Date(today.getFullYear(),today.getMonth()+1,payD);
+    }
+    const diffDays = Math.ceil((payDate-today)/(1000*60*60*24));
+    if(diffDays<0||diffDays>14) return null;
+    const amt = d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly;
+    const icon = d.type==="kredi_karti"?"💳":d.type==="kmh"?"🏦":"📋";
+    const label = d.name.replace("K.Kartı - ","").replace("KMH - ","");
+    const isPaid = !!paidAlerts[d.id+"_"+curMonth];
+    return {id:d.id,name:label,fullName:d.name,type:d.type,diffDays,payDate,amt,icon,isPaid};
+  }).filter(Boolean).sort((a,b)=>a.isPaid-b.isPaid||a.diffDays-b.diffDays);
+  // Geriye uyumluluk için cardAlerts da tut
+  const cardAlerts=[];
 
   // Master ödeme planı
   function masterPlan(){
@@ -739,6 +751,29 @@ function App(){
 
   function updateUserPayment(id,val){setDebts(p=>p.map(d=>d.id===id?{...d,userPayment:Math.max(0,Number(val))}:d));}
 
+  function markPaid(alert){
+    const key = alert.id+"_"+curMonth;
+    // Remaining'den ödenen tutarı düş
+    setDebts(p=>p.map(d=>{
+      if(d.id!==alert.id) return d;
+      const newRem = Math.max(0, d.remaining - alert.amt);
+      return {...d, remaining: newRem};
+    }));
+    setPaidAlerts(p=>({...p,[key]:true}));
+    showToast(`✅ ${alert.name} ödemesi işaretlendi · ${new Intl.NumberFormat("tr-TR").format(alert.amt)}₺`);
+  }
+
+  function unmarkPaid(alert){
+    const key = alert.id+"_"+curMonth;
+    // Remaining'e geri ekle
+    setDebts(p=>p.map(d=>{
+      if(d.id!==alert.id) return d;
+      return {...d, remaining: d.remaining + alert.amt};
+    }));
+    setPaidAlerts(p=>{const n={...p};delete n[key];return n;});
+    showToast("↩️ Ödeme geri alındı", "#e67e22");
+  }
+
 
   // Kredi kartı harcamasını kesim gününe göre taksit kayıtlarına dönüştür
   function buildCardExpenses(card, category, icon, amt, inst, purchaseDateStr){
@@ -775,6 +810,7 @@ function App(){
 
   // ── SES İLE HARCAMA ──────────────────────────────────────────────────────
   const [toast, setToast] = useState(null);
+  const [alertsOpen, setAlertsOpen] = useState(true);
   function showToast(msg, color="#27ae60"){
     setToast({msg, color});
     setTimeout(()=>setToast(null), 3000);
@@ -1262,12 +1298,70 @@ Türkçe, samimi, max 350 kelime.`;
           {toast.msg}
         </div>}
 
-        {/* Kart uyarıları */}
-        {cardAlerts.map(a=>(
-          <div key={a.id} style={{background:"rgba(255,200,0,.2)",border:"1px solid rgba(255,200,0,.4)",borderRadius:10,padding:"8px 12px",marginBottom:8,fontSize:11}}>
-            ⚠️ <strong>{a.name}</strong> son ödeme {a.diffDays===0?"BUGÜN":a.diffDays+" gün sonra"} ({a.son.toLocaleDateString("tr-TR")})
+        {/* Ödeme Uyarıları — KMH + KK + Kredi */}
+        {paymentAlerts.length>0&&<div style={{marginBottom:8}}>
+          {/* Başlık — aç/kapa */}
+          <div onClick={()=>setAlertsOpen(p=>!p)}
+            style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+              background:paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=2)?"#fff0f0":paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=7)?"#fffbf0":"#f8f9ff",
+              border:`1.5px solid ${paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=2)?"#e74c3c":paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=7)?"#f39c12":"#c5cae9"}`,
+              borderRadius:alertsOpen?"12px 12px 0 0":12,padding:"10px 13px",cursor:"pointer",marginBottom:0}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:14}}>{paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=2)?"🚨":paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=7)?"⚠️":"📅"}</span>
+              <span style={{fontSize:12,fontWeight:700}}>
+                Yaklaşan Ödemeler
+                <span style={{marginLeft:6,background:"#c0392b",color:"#fff",borderRadius:20,padding:"1px 7px",fontSize:10}}>
+                  {paymentAlerts.filter(a=>!a.isPaid).length}
+                </span>
+                {paymentAlerts.some(a=>a.isPaid)&&<span style={{marginLeft:4,background:"#27ae60",color:"#fff",borderRadius:20,padding:"1px 7px",fontSize:10}}>
+                  ✓ {paymentAlerts.filter(a=>a.isPaid).length} ödendi
+                </span>}
+              </span>
+            </div>
+            <span style={{fontSize:12,color:"#aaa"}}>{alertsOpen?"▲":"▼"}</span>
           </div>
-        ))}
+          {/* Liste */}
+          {alertsOpen&&<div style={{border:"1.5px solid #e0e0e0",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
+            {paymentAlerts.map((a,idx)=>{
+              const isUrgent=!a.isPaid&&a.diffDays<=2;
+              const isSoon=!a.isPaid&&a.diffDays<=7;
+              const bg=a.isPaid?"#f0fff4":isUrgent?"#fff0f0":isSoon?"#fffbf0":"#fafbff";
+              const accentColor=a.isPaid?"#27ae60":isUrgent?"#c0392b":isSoon?"#d68910":"#2980b9";
+              const urgencyLabel=a.isPaid?"✓ Ödendi":a.diffDays===0?"BUGÜN!":a.diffDays===1?"Yarın!":a.diffDays+" gün";
+              return <div key={a.id} style={{background:bg,padding:"10px 13px",borderBottom:idx<paymentAlerts.length-1?"1px solid #f0f0f0":"none",
+                display:"flex",justifyContent:"space-between",alignItems:"center",opacity:a.isPaid?.7:1}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+                    <span>{a.icon}</span>
+                    <span style={{fontSize:12,fontWeight:700,color:a.isPaid?"#27ae60":"#1a1a2e",textDecoration:a.isPaid?"line-through":"none"}}>{a.name}</span>
+                    <span style={{fontSize:10,background:accentColor,color:"#fff",borderRadius:20,padding:"1px 7px",fontWeight:700}}>{urgencyLabel}</span>
+                  </div>
+                  <div style={{fontSize:11,color:"#888"}}>
+                    {a.payDate.toLocaleDateString("tr-TR",{day:"numeric",month:"long"})}
+                    <span style={{fontWeight:700,color:accentColor,marginLeft:6}}>{new Intl.NumberFormat("tr-TR").format(a.amt)}₺</span>
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:5,flexShrink:0}}>
+                  {!a.isPaid
+                    ? <>
+                        <button onClick={()=>markPaid(a)}
+                          style={{background:"#27ae60",color:"#fff",border:"none",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
+                          ✓ Ödendi
+                        </button>
+                        <button onClick={()=>{setChatInput(`${a.fullName} için ${a.diffDays===0?"bugün":a.diffDays+" gün içinde"} ${new Intl.NumberFormat("tr-TR").format(a.amt)}₺ ödeme var. Planımı etkiler mi?`);setTab("ai");}}
+                          style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"5px 8px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
+                          🤖
+                        </button>
+                      </>
+                    : <button onClick={()=>unmarkPaid(a)}
+                        style={{background:"#f5f5f5",color:"#888",border:"1px solid #ddd",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
+                        ↩️ Geri al
+                      </button>}
+                </div>
+              </div>;
+            })}
+          </div>}
+        </div>}
 
         <div style={{display:"flex",gap:8,marginBottom:12}}>
           <div style={{flex:1,background:"rgba(255,255,255,.1)",borderRadius:14,padding:"10px 12px"}}>
@@ -2182,24 +2276,16 @@ Türkçe, samimi, max 350 kelime.`;
           {(()=>{
             // Proaktif uyarılar — kesim tarihi yakın kartlar
             const today=new Date().getDate();
-            const alerts=debts.filter(d=>{
-              const payD=d.sonOdemeGunu||d.payDay;
-              if(!payD) return false;
-              const diff=payD-today;
-              return diff>=0&&diff<=7;
-            });
-            return alerts.length>0&&<div style={{marginBottom:10}}>
-              {alerts.map(d=>{
-                const payD=d.sonOdemeGunu||d.payDay;
-                const diff=payD-today;
-                return <div key={d.id} style={{background:diff<=3?"#fff0f0":"#fffbf0",border:`1.5px solid ${diff<=3?"#e74c3c":"#f39c12"}`,borderRadius:12,padding:"10px 13px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            return paymentAlerts.length>0&&<div style={{marginBottom:10}}>
+              {paymentAlerts.map(a=>(
+                <div key={a.id} style={{background:a.diffDays<=2?"#fff0f0":a.diffDays<=7?"#fffbf0":"#f0f8ff",border:`1.5px solid ${a.diffDays<=2?"#e74c3c":a.diffDays<=7?"#f39c12":"#3498db"}`,borderRadius:12,padding:"10px 13px",marginBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <div>
-                    <div style={{fontSize:12,fontWeight:700,color:diff<=3?"#c0392b":"#e67e22"}}>{diff<=3?"🚨":"⚡"} {d.name}</div>
-                    <div style={{fontSize:11,color:"#888"}}>{diff===0?"Bugün son gün!":diff===1?"Yarın son gün!":`${diff} gün kaldı`} · {fmt(d.userPayment||d.monthly)}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:a.diffDays<=2?"#c0392b":a.diffDays<=7?"#e67e22":"#2980b9"}}>{a.icon} {a.name}</div>
+                    <div style={{fontSize:11,color:"#888"}}>{a.diffDays===0?"Bugün!":a.diffDays===1?"Yarın!":a.diffDays+" gün kaldı"} · {fmt(a.amt)}</div>
                   </div>
-                  <button onClick={()=>{setChatInput(`${d.name} için ${diff} gün içinde ${fmt(d.userPayment||d.monthly)} ödeme yapmam gerekiyor. Bu konuda ne önerirsin?`);setTimeout(()=>chatInputRef.current?.focus(),50);}} style={{background:diff<=3?"#c0392b":"#e67e22",color:"#fff",border:"none",borderRadius:8,padding:"5px 9px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>AI'a Sor</button>
-                </div>;
-              })}
+                  <button onClick={()=>{setChatInput(`${a.fullName} için ${a.diffDays===0?"bugün":a.diffDays+" gün içinde"} ${fmt(a.amt)} ödeme var. Bu konuda ne önerirsin?`);setTimeout(()=>chatInputRef.current?.focus(),50);}} style={{background:a.diffDays<=2?"#c0392b":a.diffDays<=7?"#e67e22":"#3498db",color:"#fff",border:"none",borderRadius:8,padding:"5px 9px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>AI'a Sor</button>
+                </div>
+              ))}
             </div>;
           })()}
           {chatMessages.length===0&&<div style={{marginBottom:10}}>
