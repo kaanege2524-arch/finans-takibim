@@ -213,6 +213,7 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
     const fixedTotal = fixed.reduce((s,d) => s + Math.min(d.monthly, d.rem), 0);
 
     // Kullanılabilir nakit
+    const carryOverThisMonth = carryOver;
     const available = Math.max(0, income + carryOver - fixedTotal - livingCost);
     carryOver = 0;
 
@@ -234,15 +235,19 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
       // 1) Herkese minimum öde
       let rem = available;
       sorted.forEach(d => {
-        const min = Math.min(Math.ceil(d.rem * 0.20), d.rem);
-        pays[d.id] = min;
-        rem -= min;
+        const interest = Math.round(d.rem * d.rate / 100);
+        const min = Math.min(Math.ceil(d.rem * 0.20) + interest, d.rem + interest);
+        pays[d.id] = Math.min(min, rem);
+        rem -= pays[d.id];
       });
       rem = Math.max(0, rem);
-      // 2) Kalan nakiti stratejiye göre öncelikli borca ver
+      // 2) Kalan nakiti stratejiye göre öncelikli borca ver (faiz dahil tam kapatma tutarı)
       for(let i = 0; i < sorted.length && rem > 0; i++){
-        const add = Math.min(rem, sorted[i].rem - pays[sorted[i].id]);
-        if(add > 0){ pays[sorted[i].id] += add; rem -= add; }
+        const d = sorted[i];
+        const interest = Math.round(d.rem * d.rate / 100);
+        const fullPayoff = d.rem + interest; // Borcu tamamen kapatmak için gereken
+        const add = Math.min(rem, fullPayoff - pays[d.id]);
+        if(add > 0){ pays[d.id] += add; rem -= add; }
       }
     }
 
@@ -275,7 +280,7 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
     const surplus = Math.max(0, available - (monthTotal - fixedTotal));
     carryOver = surplus;
 
-    log.push({ label, monthIdx: mi, income, livingCost, additions, payments, total: monthTotal, surplus });
+    log.push({ label, monthIdx: mi, income, carryOver: carryOverThisMonth, livingCost, additions, payments, total: monthTotal, surplus });
   }
 
   return log;
@@ -1757,7 +1762,14 @@ Türkçe, samimi, max 350 kelime.`;
                 <div>
                   <div style={{fontSize:14,fontWeight:800}}>{mg.label}</div>
                   <div style={{fontSize:10,color:"#888"}}>
-                    Gelir: {fmt(mg.income)} · Kira: {fmt(mg.livingCost)} · Kalan: <span style={{color:mg.surplus>=0?"#27ae60":"#e74c3c",fontWeight:700}}>{fmt(mg.surplus)}</span>
+                    Gelir: {fmt(mg.income)}
+                    {mg.carryOver>0&&<span style={{color:"#8e44ad"}}> + Devir: {fmt(mg.carryOver)}</span>}
+                    {" · "}Kira: {fmt(mg.livingCost)}
+                    {" · "}
+                    {mg.surplus>0
+                      ? <span style={{color:"#27ae60",fontWeight:700}}>💰 Serbest: {fmt(mg.surplus)}</span>
+                      : <span style={{color:"#e74c3c",fontWeight:700}}>⚠️ Açık: {fmt(Math.abs(mg.surplus))}</span>
+                    }
                   </div>
                 </div>
                 <div style={{textAlign:"right"}}>
