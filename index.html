@@ -479,7 +479,7 @@ function App(){
   const [showAddExp,setShowAddExp]=useState(false);
   const [selectedMonth,setSelectedMonth]=useState(new Date().toISOString().slice(0,7));
   const [showQuickExp,setShowQuickExp]=useState(false);
-  const [quickForm,setQuickForm]=useState({category:"Market",amount:"",payMethod:"kredi_karti",cardId:"",installments:1,note:"",kmhId:""});
+  const [quickForm,setQuickForm]=useState({category:"Market",amount:"",payMethod:"nakit",cardId:"",installments:1,note:"",kmhId:""});
   const [showAddIncome,setShowAddIncome]=useState(false);
   const [showPurchase,setShowPurchase]=useState(false);
   const [showAddRecurring,setShowAddRecurring]=useState(false);
@@ -1072,9 +1072,7 @@ Türkçe, samimi, max 350 kelime.`;
             <button onClick={startVoice} style={{background:voiceActive?"rgba(231,76,60,.7)":"rgba(255,255,255,.18)",border:`1px solid ${voiceActive?"rgba(231,76,60,.9)":"rgba(255,255,255,.3)"}`,color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:13,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700,transition:"all .2s"}}>
               {voiceActive?"🔴 Dinliyor...":"🎤"}
             </button>
-            <button onClick={exportExcel} style={{background:"rgba(255,255,255,.18)",border:"1px solid rgba(255,255,255,.3)",color:"#fff",borderRadius:10,padding:"7px 12px",fontSize:11,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:600}}>
-              📊 Excel
-            </button>
+
             <button onClick={()=>{
               setWizardData({salary:81000,incomes:[],debts:[],recurring:[]});
               setWizardStep(0);
@@ -1191,8 +1189,8 @@ Türkçe, samimi, max 350 kelime.`;
               style={{...inp,marginBottom:14,fontSize:13}}/>
 
             <button onClick={saveQuickExp}
-              disabled={!quickForm.amount||!quickForm.category||(quickForm.payMethod==="kredi_karti"&&!quickForm.cardId)}
-              style={{...btnP,fontSize:15,padding:"14px",opacity:(!quickForm.amount||(quickForm.payMethod==="kredi_karti"&&!quickForm.cardId))?.5:1}}>
+              disabled={!quickForm.amount||!quickForm.category}
+              style={{...btnP,fontSize:15,padding:"14px",opacity:(!quickForm.amount||!quickForm.category)?.5:1}}>
               ✅ Kaydet
             </button>
           </div>
