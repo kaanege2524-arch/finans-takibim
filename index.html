@@ -622,11 +622,11 @@ function App(){
     manuel:    buildCascadePlan(debts, salary, incomes, "manuel",    livingForPlan, recurringExp),
   }),[debts, salary, incomes, livingForPlan]);
   const cascadeThisMonth = cascadePlans?.[selectedStrategy]?.[0];
-  // Cascade'in bu ay için hesapladığı değerleri direkt kullan
-  const cascadeMonthlyTotal = cascadeThisMonth ? cascadeThisMonth.total : totalMonthly;
-  const cascadeKira = cascadeThisMonth ? cascadeThisMonth.livingCost : livingForPlan;
-  // Net kalan = cascade surplus'ı (gelir - kira - borçlar = cascade zaten hesapladı)
-  const cascadeFreeIncome = cascadeThisMonth ? cascadeThisMonth.surplus : (totalIncome - livingForPlan - totalMonthly - totalExpenses);
+  // Bu ayın gerçek borç ödemesi = gelir - kira - net kalan (cascade surplus)
+  // Cascade güvenilir değilse direkt hesapla
+  const cascadeKira = livingForPlan;
+  const cascadeMonthlyTotal = totalIncome - cascadeKira - totalExpenses; // tüm nakit borçlara gider
+  const cascadeFreeIncome = cascadeThisMonth?.surplus ?? 0;
 
   const scenarios=useMemo(()=>{
     function planSummary(plan){
