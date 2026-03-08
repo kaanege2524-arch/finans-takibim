@@ -736,7 +736,7 @@ function App(){
         category, icon, amount: installAmt,
         date: dateStr, payMethod:"kredi_karti",
         cardId: card.id, installments: inst,
-        installmentAmt, installmentNo: i+1,
+        installmentAmt: installAmt, installmentNo: i+1,
         totalInstallments: inst,
         isInstallment: inst>1,
         note: inst>1 ? `${i+1}/${inst}. taksit` : ""
@@ -846,7 +846,6 @@ function App(){
     const todayStr=new Date().toISOString().slice(0,10);
     const inst=Number(quickForm.installments)||1;
     const amt=Number(quickForm.amount);
-    // ID karşılaştırmasını string ve number her ikisine karşı güvenli yap
     const matchId=(a,b)=>String(a)===String(b);
 
     if(quickForm.payMethod==="kredi_karti"){
