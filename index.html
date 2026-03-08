@@ -525,7 +525,7 @@ function App(){
   const [eForm,setEForm]=useState(blankExp);
   const [editExpId,setEditExpId]=useState(null);
 
-  const blankRecurring={category:"",icon:"🏠",amount:"",dayOfMonth:1,startDate:new Date().toISOString().slice(0,10),totalMonths:12,payMethod:"nakit",cardId:"",note:""};
+  const blankRecurring={category:"",icon:"🏠",amount:"",dayOfMonth:1,startDate:new Date().toISOString().slice(0,10),totalMonths:999,payMethod:"nakit",cardId:"",note:"",skipMonths:[],fundedBy:[]};
   const [rForm,setRForm]=useState(blankRecurring);
   const [catForm,setCatForm]=useState({name:"",icon:"📌"});
 
@@ -546,12 +546,18 @@ function App(){
 
   // Bu ay aktif tekrarlayan giderleri hesapla
   const activeRecurring=useMemo(()=>{
+    const nowDate=new Date();
+    const nowMonthIdx=nowDate.getMonth(); // 0=Ocak
     return recurringExp.filter(r=>{
       const start=new Date(r.startDate);
       const startMonth=start.getFullYear()*12+start.getMonth();
-      const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
+      const nowMonth=nowDate.getFullYear()*12+nowDate.getMonth();
       const elapsed=nowMonth-startMonth;
-      return elapsed>=0&&elapsed<r.totalMonths;
+      if(elapsed<0||elapsed>=(r.totalMonths||999)) return false;
+      // skipMonths: bu ay atlanıyorsa dahil etme
+      const skip=r.skipMonths||[];
+      if(skip.includes(nowMonthIdx)) return false;
+      return true;
     });
   },[recurringExp]);
 
@@ -577,7 +583,7 @@ function App(){
   function saveRecurring(){
     const finalCat=rForm.category==="__new__"?(rForm.customCatName||"").trim():rForm.category;
     if(!finalCat||!rForm.amount)return;
-    const data={...rForm,category:finalCat,amount:Number(rForm.amount),dayOfMonth:Number(rForm.dayOfMonth)||1,totalMonths:Number(rForm.totalMonths)||12,cardId:rForm.cardId?Number(rForm.cardId):null};
+    const data={...rForm,category:finalCat,amount:Number(rForm.amount),dayOfMonth:Number(rForm.dayOfMonth)||1,totalMonths:Number(rForm.totalMonths)||999,cardId:rForm.cardId?Number(rForm.cardId):null,skipMonths:rForm.skipMonths||[],fundedBy:rForm.fundedBy||[]};
     if(editRecurringId){setRecurringExp(p=>p.map(r=>r.id===editRecurringId?{...r,...data}:r));setEditRecurringId(null);}
     else{setRecurringExp(p=>[...p,{id:Date.now(),...data}]);}
     // Yeni kategoriyse listeye ekle
@@ -623,7 +629,7 @@ function App(){
       payDate = new Date(today.getFullYear(),today.getMonth()+1,payD);
     }
     const diffDays = Math.ceil((payDate-today)/(1000*60*60*24));
-    if(diffDays<0||diffDays>14) return null;
+    if(diffDays<0||diffDays>31) return null;
     const amt = d.type!=="kredi"?(d.userPayment||d.monthly):d.monthly;
     const icon = d.type==="kredi_karti"?"💳":d.type==="kmh"?"🏦":"📋";
     const typeLabel = d.type==="kredi_karti"?"KK":d.type==="kmh"?"KMH":"Kredi";
@@ -651,12 +657,16 @@ function App(){
   const plan=useMemo(()=>masterPlan(),[debts]);
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
-  // livingForPlan: livingItems toplamı varsa onu kullan, yoksa planLiving
-  const livingForPlan = livingItems.length > 0
-    ? livingItems.reduce((s,i) => s + (i.amount||0), 0)
-    : ((planLiving >= 1000) ? planLiving : estLiving);
-  // planLiving'i de güncel tut (geriye uyumluluk)
-  // (cascade zaten livingForPlan kullanıyor)
+  // livingForPlan: recurringExp içindeki "kira" kategorili sabit giderlerden hesapla
+  // Yoksa planLiving, o da yoksa varsayılan 27000
+  const livingForPlan = (() => {
+    const kiraRec = recurringExp.filter(r => {
+      const cat = (r.category||"").toLowerCase();
+      return cat.includes("kira") || cat.includes("ev ");
+    });
+    if(kiraRec.length > 0) return kiraRec.reduce((s,r)=>s+r.amount,0);
+    return (planLiving >= 1000) ? planLiving : estLiving;
+  })();
   const cascadePlans=useMemo(()=>({
     avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp),
     snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
@@ -1348,6 +1358,7 @@ Türkçe, samimi, max 350 kelime.`;
                   <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
                     <span>{a.icon}</span>
                     <span style={{fontSize:12,fontWeight:700,color:a.isPaid?"#27ae60":"#1a1a2e",textDecoration:a.isPaid?"line-through":"none"}}>{a.name}</span>
+                    <span style={{fontSize:9,background:a.type==="kredi_karti"?"#fdf3e8":a.type==="kmh"?"#f3e8fd":"#e8f4fd",color:a.type==="kredi_karti"?"#e67e22":a.type==="kmh"?"#8e44ad":"#2980b9",borderRadius:20,padding:"1px 7px",fontWeight:700,flexShrink:0}}>{a.type==="kredi_karti"?"KK":a.type==="kmh"?"KMH":"Kredi"}</span>
                     <span style={{fontSize:10,background:accentColor,color:"#fff",borderRadius:20,padding:"1px 7px",fontWeight:700}}>{urgencyLabel}</span>
                   </div>
                   <div style={{fontSize:11,color:"#888"}}>
@@ -1359,18 +1370,23 @@ Türkçe, samimi, max 350 kelime.`;
                   {!a.isPaid
                     ? <>
                         <button onClick={()=>markPaid(a)}
-                          style={{background:"#27ae60",color:"#fff",border:"none",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
-                          ✓ Ödendi
+                          style={{background:"#fdf0f0",color:"#c0392b",border:"1.5px solid #e74c3c",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
+                          🔴 Ödenecek
                         </button>
                         <button onClick={()=>{setChatInput(`${a.fullName} için ${a.diffDays===0?"bugün":a.diffDays+" gün içinde"} ${new Intl.NumberFormat("tr-TR").format(a.amt)}₺ ödeme var. Planımı etkiler mi?`);setTab("ai");}}
                           style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"5px 8px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
                           🤖
                         </button>
                       </>
-                    : <button onClick={()=>unmarkPaid(a)}
-                        style={{background:"#f5f5f5",color:"#888",border:"1px solid #ddd",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
-                        ↩️ Geri al
-                      </button>}
+                    : <div style={{display:"flex",gap:5}}>
+                        <span style={{background:"#e8f5e9",color:"#27ae60",border:"1.5px solid #27ae60",borderRadius:8,padding:"5px 10px",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
+                          ✅ Ödendi
+                        </span>
+                        <button onClick={()=>unmarkPaid(a)}
+                          style={{background:"#f5f5f5",color:"#888",border:"1px solid #ddd",borderRadius:8,padding:"5px 8px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
+                          ↩️
+                        </button>
+                      </div>}
                 </div>
               </div>;
             })}
@@ -1939,6 +1955,89 @@ Türkçe, samimi, max 350 kelime.`;
                 Toplam: {fmt(Number(rForm.amount)*Number(rForm.totalMonths))} ({rForm.totalMonths} ay × {fmt(Number(rForm.amount))})
               </div>}
             </div>
+            {/* Skip aylar */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:5,fontWeight:600}}>⛔ Bu aylarda ÖDENMEYECEK (tıkla seç)</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"].map((mn,i)=>{
+                  const sel=(rForm.skipMonths||[]).includes(i);
+                  return <button key={i} onClick={()=>{
+                    const s=rForm.skipMonths||[];
+                    setRForm({...rForm,skipMonths:sel?s.filter(x=>x!==i):[...s,i]});
+                  }} style={{padding:"4px 9px",fontSize:11,borderRadius:20,
+                    border:`1.5px solid ${sel?"#e74c3c":"#e0e0e0"}`,
+                    background:sel?"#fdf0f0":"#fff",color:sel?"#c0392b":"#666",
+                    cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
+                    {mn}
+                  </button>;
+                })}
+              </div>
+              {(rForm.skipMonths||[]).length>0&&<div style={{fontSize:10,color:"#e74c3c",marginTop:4}}>
+                ⛔ {(rForm.skipMonths).map(i=>["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"][i]).join(", ")} aylarında bu gider sayılmayacak
+              </div>}
+            </div>
+
+            {/* Hangi gelirden karşılanıyor */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:5,fontWeight:600}}>💡 Hangi gelirden karşılanıyor? (isteğe bağlı)</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {[{label:"💰 Maaş",key:"maas"},{label:"🏠 Kira Geliri",key:"kira_geliri"},...incomes.map(i=>({label:i.label,key:"inc_"+i.id}))].filter((v,idx,a)=>a.findIndex(x=>x.key===v.key)===idx).map(src=>{
+                  const sel=(rForm.fundedBy||[]).includes(src.key);
+                  return <button key={src.key} onClick={()=>{
+                    const fb=rForm.fundedBy||[];
+                    setRForm({...rForm,fundedBy:sel?fb.filter(x=>x!==src.key):[...fb,src.key]});
+                  }} style={{padding:"4px 10px",fontSize:11,borderRadius:20,
+                    border:`1.5px solid ${sel?"#8e44ad":"#ddd"}`,
+                    background:sel?"#8e44ad":"#fff",color:sel?"#fff":"#666",
+                    cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
+                    {src.label}
+                  </button>;
+                })}
+              </div>
+            </div>
+
+            {/* Skip aylar */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:5,fontWeight:600}}>⛔ Bu aylarda ÖDENMEYECEK (tıkla seç)</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"].map((mn,i)=>{
+                  const sel=(rForm.skipMonths||[]).includes(i);
+                  return <button key={i} onClick={()=>{
+                    const s=rForm.skipMonths||[];
+                    setRForm({...rForm,skipMonths:sel?s.filter(x=>x!==i):[...s,i]});
+                  }} style={{padding:"4px 9px",fontSize:11,borderRadius:20,
+                    border:`1.5px solid ${sel?"#e74c3c":"#e0e0e0"}`,
+                    background:sel?"#fdf0f0":"#fff",color:sel?"#c0392b":"#666",
+                    cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
+                    {mn}
+                  </button>;
+                })}
+              </div>
+              {(rForm.skipMonths||[]).length>0&&<div style={{fontSize:10,color:"#e74c3c",marginTop:4}}>
+                ⛔ {(rForm.skipMonths).map(i=>["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"][i]).join(", ")} aylarında sayılmayacak
+              </div>}
+            </div>
+            {/* Hangi gelirden karşılanıyor */}
+            <div style={{marginBottom:8}}>
+              <div style={{fontSize:11,color:"#888",marginBottom:5,fontWeight:600}}>💡 Hangi gelirden karşılanıyor? (isteğe bağlı)</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                {[{label:"💰 Maaş",key:"maas"},{label:"🏠 Kira Geliri",key:"kira_geliri"},...incomes.map(i=>({label:i.label,key:"inc_"+i.id}))].filter((v,idx2,a)=>a.findIndex(x=>x.key===v.key)===idx2).map(src=>{
+                  const sel=(rForm.fundedBy||[]).includes(src.key);
+                  return <button key={src.key} onClick={()=>{
+                    const fb=rForm.fundedBy||[];
+                    setRForm({...rForm,fundedBy:sel?fb.filter(x=>x!==src.key):[...fb,src.key]});
+                  }} style={{padding:"4px 10px",fontSize:11,borderRadius:20,
+                    border:`1.5px solid ${sel?"#8e44ad":"#ddd"}`,
+                    background:sel?"#8e44ad":"#fff",color:sel?"#fff":"#666",
+                    cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
+                    {src.label}
+                  </button>;
+                })}
+              </div>
+              {(rForm.fundedBy||[]).length>0&&<div style={{fontSize:10,color:"#8e44ad",marginTop:4}}>
+                💡 Kaynak: {(rForm.fundedBy).map(k=>k==="maas"?"Maaş":k==="kira_geliri"?"Kira Geliri":incomes.find(i=>"inc_"+i.id===k)?.label||k).join(" + ")}
+              </div>}
+            </div>
             <input style={inp} placeholder="Not (isteğe bağlı: örn. Yıllık kira sözleşmesi)" value={rForm.note} onChange={e=>setRForm({...rForm,note:e.target.value})}/>
 
             <div style={{fontSize:11,color:"#888",marginBottom:6,fontWeight:600}}>💳 Ödeme Yöntemi</div>
@@ -2175,85 +2274,15 @@ Türkçe, samimi, max 350 kelime.`;
             </div>
           </Card>}
 
-          {/* Yaşam Giderleri Paneli */}
-          <Card style={{marginBottom:8,padding:"12px 14px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <div>
-                <span style={{fontSize:13,fontWeight:700}}>🏠 Yaşam Giderleri</span>
-                <span style={{fontSize:12,fontWeight:800,color:"#8e44ad",marginLeft:8}}>{fmt(livingForPlan)}</span>
-              </div>
-              <button onClick={()=>{setLForm(blankLForm);setEditLivingId(null);setShowLivingForm(p=>!p);}}
-                style={{...btnS("#8e44ad"),width:"auto",padding:"5px 11px",fontSize:11,margin:0}}>+ Ekle</button>
-            </div>
+          {/* Kira özeti — Giderler > Sabit Gider'den yönetilir */}
+          {(()=>{
+            const kiraItems = recurringExp.filter(r=>r.category&&r.category.toLowerCase().includes("kira"));
+            const kiraTotal = kiraItems.reduce((s,r)=>s+r.amount,0);
+            if(kiraTotal>0 && kiraTotal!==livingForPlan) return null; // zaten aşağıda görünüyor
+            return null;
+          })()}
 
-            {/* Form */}
-            {showLivingForm&&<div style={{background:"#f9f0ff",border:"1.5px dashed #8e44ad",borderRadius:10,padding:"12px",marginBottom:10}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                <input style={{...inp,marginBottom:0}} placeholder="Ad (örn: Kira)" value={lForm.label}
-                  onChange={e=>setLForm({...lForm,label:e.target.value})}/>
-                <input style={{...inp,marginBottom:0}} type="number" placeholder="Tutar ₺" value={lForm.amount}
-                  onChange={e=>setLForm({...lForm,amount:e.target.value})}/>
-              </div>
-              <div style={{marginTop:8,marginBottom:8}}>
-                <div style={{fontSize:11,color:"#8e44ad",fontWeight:600,marginBottom:5}}>💡 Bu gider hangi gelirden karşılanıyor? (isteğe bağlı)</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                  {[{label:"💰 Maaş",key:"maas"},{label:"🏠 Kira Geliri",key:"kira_geliri"},{label:"📚 Ek Ders",key:"ek_ders"},...incomes.map(i=>({label:i.label,key:"inc_"+i.id}))].filter((v,i,a)=>a.findIndex(x=>x.key===v.key)===i).map(src=>{
-                    const sel=(lForm.fundedBy||[]).includes(src.key);
-                    return <button key={src.key} onClick={()=>{
-                      const fb=lForm.fundedBy||[];
-                      setLForm({...lForm,fundedBy:sel?fb.filter(x=>x!==src.key):[...fb,src.key]});
-                    }} style={{padding:"4px 10px",fontSize:11,borderRadius:20,
-                      border:`1.5px solid ${sel?"#8e44ad":"#ddd"}`,
-                      background:sel?"#8e44ad":"#fff",color:sel?"#fff":"#666",
-                      cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
-                      {src.label}
-                    </button>;
-                  })}
-                </div>
-              </div>
-              <input style={{...inp,marginBottom:8}} placeholder="Not (isteğe bağlı)" value={lForm.note}
-                onChange={e=>setLForm({...lForm,note:e.target.value})}/>
-              <div style={{display:"flex",gap:8}}>
-                <button onClick={()=>{
-                  if(!lForm.label||!lForm.amount)return;
-                  const item={id:editLivingId||Date.now(),...lForm,amount:Number(lForm.amount)};
-                  if(editLivingId){setLivingItems(p=>p.map(x=>x.id===editLivingId?item:x));}
-                  else{setLivingItems(p=>[...p,item]);}
-                  setLForm(blankLForm);setEditLivingId(null);setShowLivingForm(false);
-                  showToast("✅ Yaşam gideri kaydedildi");
-                }} style={{...btnS("#8e44ad"),margin:0,fontSize:12}}>💾 Kaydet</button>
-                <button onClick={()=>{setShowLivingForm(false);setEditLivingId(null);setLForm(blankLForm);}}
-                  style={{...btnP,background:"#eee",color:"#555",margin:0,fontSize:12}}>İptal</button>
-              </div>
-            </div>}
-
-            {/* Liste */}
-            {livingItems.map(item=>(
-              <div key={item.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"#faf5ff",borderRadius:10,marginBottom:6,border:"1px solid #e8d5f5"}}>
-                <span style={{fontSize:16}}>{item.icon||"🏠"}</span>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:700}}>{item.label}</div>
-                  {item.fundedBy?.length>0&&<div style={{fontSize:10,color:"#8e44ad"}}>
-                    Kaynak: {item.fundedBy.map(k=>k==="maas"?"Maaş":k==="kira_geliri"?"Kira Geliri":k==="ek_ders"?"Ek Ders":incomes.find(i=>"inc_"+i.id===k)?.label||k).join(" + ")}
-                  </div>}
-                  {item.note&&<div style={{fontSize:10,color:"#aaa"}}>{item.note}</div>}
-                </div>
-                <div style={{fontSize:14,fontWeight:800,color:"#8e44ad"}}>{fmt(item.amount)}</div>
-                <div style={{display:"flex",gap:4}}>
-                  <button onClick={()=>{setLForm({...item,amount:String(item.amount)});setEditLivingId(item.id);setShowLivingForm(true);}}
-                    style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:7,padding:"3px 7px",fontSize:11,cursor:"pointer"}}>✏️</button>
-                  <button onClick={()=>{if(window.confirm("Sil?"))setLivingItems(p=>p.filter(x=>x.id!==item.id));}}
-                    style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:7,padding:"3px 7px",fontSize:11,cursor:"pointer"}}>🗑</button>
-                </div>
-              </div>
-            ))}
-            <div style={{borderTop:"1px solid #eee",paddingTop:8,display:"flex",justifyContent:"space-between"}}>
-              <span style={{fontSize:11,color:"#888"}}>Toplam yaşam gideri</span>
-              <span style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(livingForPlan)}</span>
-            </div>
-          </Card>
-
-          {/* Cascade takvim */}
+                    {/* Cascade takvim */}
           <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:8}}>🗓 Aylık Takvim</div>
           {(showFullPlan?cascadePlans[selectedStrategy]:cascadePlans[selectedStrategy].slice(0,4)).map((mg,mgi)=>{
             const isExpanded = expandedMonths.has(mg.label);
