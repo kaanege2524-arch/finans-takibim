@@ -577,11 +577,10 @@ function App(){
   const totalDebt = debts.reduce((s,d) => s + d.remaining, 0);
   // Borç ödemeleri: bu ayın gerçek ödemeleri (kartlı harcama taksitleri dahil)
   const totalMonthly = debts.reduce((s,d) => s + (d.type !== "kredi" && d.userPayment ? d.userPayment : d.monthly), 0);
-  // Giderler: bu ay tarihli nakit/kart harcamaları (kart taksit = o ayın payı)
   const totalExpenses = allExpenses
     .filter(e => e.date.slice(0,7) === curMonth && e.payMethod !== "kmh")
     .reduce((s,e) => s + (e.isInstallment ? (e.installmentAmt || Math.round(e.amount/(e.installments||1))) : e.amount), 0);
-  const freeIncome = totalIncome - totalMonthly - totalExpenses;
+  const freeIncome = totalIncome - (planLiving || estLiving) - totalMonthly - totalExpenses;
   const debtRatio = ((totalMonthly / totalIncome) * 100).toFixed(0);
   const estLiving=27000; // Varsayılan kira
   const smart=calcSmart(debts,totalIncome,estLiving);
@@ -622,6 +621,9 @@ function App(){
     minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   livingForPlan, recurringExp),
     manuel:    buildCascadePlan(debts, salary, incomes, "manuel",    livingForPlan, recurringExp),
   }),[debts, salary, incomes, livingForPlan]);
+  const cascadeThisMonth = cascadePlans?.[selectedStrategy]?.[0];
+  const cascadeMonthlyTotal = cascadeThisMonth ? cascadeThisMonth.total : totalMonthly;
+  const cascadeFreeIncome = totalIncome - livingForPlan - cascadeMonthlyTotal - totalExpenses;
 
   const scenarios=useMemo(()=>{
     function planSummary(plan){
@@ -1055,6 +1057,7 @@ Türkçe, samimi, max 350 kelime.`;
             <div style={{fontSize:10,opacity:.65}}>Toplam Gelir</div>
             <div style={{fontSize:18,fontWeight:800}}>{fmt(totalIncome)}</div>
             {thisMonthExtra>0&&<div style={{fontSize:9,marginTop:2,color:"#a8f0c6"}}>+Ek {fmt(thisMonthExtra)}</div>}
+            <div style={{fontSize:9,marginTop:1,color:"#ff9090",opacity:.8}}>Kira+Borç: -{fmt(livingForPlan+cascadeMonthlyTotal)}</div>
           </div>
           <div style={{flex:1,background:freeIncome>=0?"rgba(46,204,113,.2)":"rgba(231,76,60,.35)",borderRadius:14,padding:"10px 12px",border:freeIncome<0?"1px solid rgba(231,76,60,.5)":"none"}}>
             <div style={{fontSize:10,opacity:.65}}>Net Kalan</div>
@@ -1103,7 +1106,7 @@ Türkçe, samimi, max 350 kelime.`;
           </Card>
           <Card>
             <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>Bu Ay Özeti</div>
-            {[["Toplam Gelir",fmt(totalIncome),"#27ae60"],["Borç Ödemesi",`-${fmt(totalMonthly)}`,"#e67e22"],["Giderler",`-${fmt(totalExpenses)}`,"#3498db"],["Net Kalan",fmt(freeIncome),freeIncome>=0?"#27ae60":"#e74c3c"]].map(([l,v,c])=>(
+            {[["Toplam Gelir",fmt(totalIncome),"#27ae60"],["Kira",`-${fmt(planLiving||estLiving)}`,"#8e44ad"],["Borç Ödemesi",`-${fmt(totalMonthly)}`,"#e67e22"],["Giderler",`-${fmt(totalExpenses)}`,"#3498db"],["Net Kalan",fmt(freeIncome),freeIncome>=0?"#27ae60":"#e74c3c"]].map(([l,v,c])=>(
               <div key={l} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
                 <span style={{fontSize:13,color:l==="Net Kalan"?"#1a1a2e":"#666",fontWeight:l==="Net Kalan"?700:400}}>{l}</span>
                 <span style={{fontSize:13,fontWeight:700,color:c}}>{v}</span>
@@ -1198,7 +1201,7 @@ Türkçe, samimi, max 350 kelime.`;
           </Card>
           {totalIncome>0&&<Card>
             <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>📊 Gelir Kullanımı</div>
-            {[["Borç Ödemeleri",totalMonthly,"#e74c3c"],["Giderler",totalExpenses,"#3498db"],["Net Kalan",Math.max(0,freeIncome),"#27ae60"]].map(([l,v,c])=>{
+            {[["Kira",livingForPlan,"#8e44ad"],["Borç Ödemeleri",cascadeMonthlyTotal,"#e74c3c"],["Giderler",totalExpenses,"#3498db"],["Net Kalan",Math.max(0,cascadeFreeIncome),"#27ae60"]].map(([l,v,c])=>{
               const pct=Math.round((v/totalIncome)*100);
               return <div key={l} style={{marginBottom:10}}>
                 <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
