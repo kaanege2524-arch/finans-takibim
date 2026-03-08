@@ -448,7 +448,7 @@ function App(){
 
   const [showFullPlan,setShowFullPlan]=useState(false);
   const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
-  const [planLiving,setPlanLiving]=useState(0); // 0 = estLiving kullan
+  const [planLiving,setPlanLiving]=useLS("ft_planliving", 27000);
   const [suggApplied,setSuggApplied]=useState(false);
   const [chatMessages,setChatMessages]=useState([]);
   const [chatInput,setChatInput]=useState("");
@@ -560,7 +560,7 @@ function App(){
   const totalExpenses=allExpenses.filter(e=>e.date.slice(0,7)===curMonth).reduce((s,e)=>s+(e.installments>1?(e.installmentAmt||Math.round(e.amount/e.installments)):e.amount),0);
   const freeIncome=totalIncome-totalMonthly-totalExpenses;
   const debtRatio=((totalMonthly/totalIncome)*100).toFixed(0);
-  const estLiving=15000; // Sabit kira — diğer giderler kartlarla ödeniyor
+  const estLiving=27000; // Varsayılan kira
   const smart=calcSmart(debts,totalIncome,estLiving);
 
   const creditCards=debts.filter(d=>d.type==="kredi_karti");
@@ -592,7 +592,7 @@ function App(){
   const plan=useMemo(()=>masterPlan(),[debts]);
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
-  const livingForPlan = planLiving > 0 ? planLiving : estLiving;
+  const livingForPlan = planLiving || estLiving;
   const cascadePlans=useMemo(()=>({
     avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp),
     snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
@@ -1734,10 +1734,10 @@ Türkçe, samimi, max 350 kelime.`;
                 <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>🏠 Kira (Sabit Gider)</div>
                 <div style={{fontSize:10,color:"#888"}}>Gelirden düşülecek kira tutarı — diğer harcamalar giderler bölümüne</div>
               </div>
-              <input type="number" value={planLiving||estLiving} onChange={e=>setPlanLiving(Number(e.target.value))}
+              <input type="number" value={planLiving} onChange={e=>setPlanLiving(Number(e.target.value))}
                 style={{width:110,border:"1.5px solid #ddd",borderRadius:8,padding:"6px 8px",fontSize:13,textAlign:"right",fontFamily:"'Sora',sans-serif"}}/>
               <span style={{fontSize:11,color:"#888"}}>₺</span>
-              {planLiving>0&&<button onClick={()=>setPlanLiving(0)} style={{fontSize:10,color:"#888",background:"none",border:"none",cursor:"pointer"}}>↩</button>}
+
             </div>
           </Card>
           {/* Strateji seçici */}
