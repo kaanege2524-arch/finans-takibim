@@ -143,7 +143,7 @@ const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maxi
 
 // ── CASCADE PLANNER ──────────────────────────────────────────────────────────
 // Her ay tüm borçları birlikte hesaplar, kapanan borcun nakitini aktarır
-function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurringExp){
+function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurringExp, expensesList){
   strategy = strategy || "avalanche";
   livingCost = livingCost || 15000;
 
@@ -200,12 +200,21 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
     const label = monthLabel(mi);
     const income = monthIncome(mi);
 
-    // Bu ay kart borçlarına geçmiş taksit ekle
+    // Bu ay kart borçlarına geçmiş taksit ekle (sabit)
     const additions = (DEBT_ADDITIONS||[]).filter(a => a.month === ms);
     additions.forEach(a => {
       const debt = state.find(s => !s.done && s.name.toLowerCase().includes(a.debtName.toLowerCase()) && s.type === "kredi_karti");
       if(debt) debt.rem += a.amount;
     });
+    // Bu ay taksitli kart harcamalarından gelen taksitleri ekle (2. taksit ve sonrası)
+    if(expensesList && mi > 0){
+      (expensesList).forEach(e => {
+        if(e.payMethod !== "kredi_karti" || !e.isInstallment || e.installmentNo === 1) return;
+        if(!e.date || e.date.slice(0,7) !== ms) return;
+        const debt = state.find(s => !s.done && String(s.id) === String(e.cardId));
+        if(debt) debt.rem += (e.installmentAmt || e.amount);
+      });
+    }
 
     const fixed = active.filter(d => d.type === "kredi");
     const flex  = active.filter(d => d.type !== "kredi");
@@ -616,10 +625,10 @@ function App(){
 
   const livingForPlan = (planLiving >= 1000) ? planLiving : estLiving;
   const cascadePlans=useMemo(()=>({
-    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp),
-    snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
-    minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   livingForPlan, recurringExp),
-    manuel:    buildCascadePlan(debts, salary, incomes, "manuel",    livingForPlan, recurringExp),
+    avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp, expenses),
+    snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp, expenses),
+    minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   livingForPlan, recurringExp, expenses),
+    manuel:    buildCascadePlan(debts, salary, incomes, "manuel",    livingForPlan, recurringExp, expenses),
   }),[debts, salary, incomes, livingForPlan]);
   const cascadeThisMonth = cascadePlans?.[selectedStrategy]?.[0];
   // Bu ayın gerçek borç ödemesi = gelir - kira - net kalan (cascade surplus)
@@ -891,7 +900,9 @@ function App(){
           icon:catObj?.icon||"📌",payMethod:"nakit",installments:1,installmentAmt:amt,note:quickForm.note||""}]);
       } else {
         const newExps=buildCardExpenses(card, quickForm.category, catObj?.icon||"📌", amt, inst, todayStr);
-        setDebts(p=>p.map(d=>matchId(d.id,card.id)?{...d,remaining:d.remaining+amt,total:(d.total||d.remaining)+amt}:d));
+        // remaining'e sadece 1. taksit tutarını ekle; diğer taksitler ay ay cascade'e beslenir
+        const installAmt2=Math.round(amt/inst);
+        setDebts(p=>p.map(d=>matchId(d.id,card.id)?{...d,remaining:d.remaining+installAmt2,total:(d.total||d.remaining)+amt}:d));
         setExpenses(p=>[...p,...newExps]);
       }
     } else if(quickForm.payMethod==="kmh"){
