@@ -452,6 +452,7 @@ function App(){
   },[debts,expenses,recurringExp,customCats,incomes,salary]);
 
   const [showFullPlan,setShowFullPlan]=useState(false);
+  const [expandedMonths,setExpandedMonths]=useState(new Set());
   const [selectedStrategy,setSelectedStrategy]=useState("avalanche");
   const [planLiving,setPlanLiving]=useLS("ft_planliving", 27000);
   const [suggApplied,setSuggApplied]=useState(false);
@@ -1756,50 +1757,61 @@ Türkçe, samimi, max 350 kelime.`;
 
           {/* Cascade takvim */}
           <div style={{fontSize:13,fontWeight:700,color:"#1a1a2e",marginBottom:8}}>🗓 Aylık Takvim</div>
-          {(showFullPlan?cascadePlans[selectedStrategy]:cascadePlans[selectedStrategy].slice(0,4)).map(mg=>(
-            <Card key={mg.label} style={{padding:"13px 12px"}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
-                <div>
-                  <div style={{fontSize:14,fontWeight:800}}>{mg.label}</div>
-                  <div style={{fontSize:10,color:"#888"}}>
+          {(showFullPlan?cascadePlans[selectedStrategy]:cascadePlans[selectedStrategy].slice(0,4)).map((mg,mgi)=>{
+            const isExpanded = expandedMonths.has(mg.label);
+            const finished = mg.payments.filter(p=>p.finished);
+            return (
+            <Card key={mg.label} style={{padding:"12px",marginBottom:8}}>
+              {/* BAŞLIK SATIRI — her zaman görünür */}
+              <div style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer"}} onClick={()=>setExpandedMonths(prev=>{const s=new Set(prev);s.has(mg.label)?s.delete(mg.label):s.add(mg.label);return s;})}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:14,fontWeight:800,display:"flex",alignItems:"center",gap:6}}>
+                    {mg.label}
+                    {finished.length>0&&<span style={{fontSize:10,background:"#e8f5e9",color:"#27ae60",borderRadius:20,padding:"1px 7px",fontWeight:700}}>✅ {finished.length} kapandı</span>}
+                  </div>
+                  <div style={{fontSize:10,color:"#888",marginTop:2}}>
                     Gelir: {fmt(mg.income)}
-                    {mg.carryOver>0&&<span style={{color:"#8e44ad"}}> + Devir: {fmt(mg.carryOver)}</span>}
+                    {mg.carryOver>0&&<span style={{color:"#8e44ad",fontWeight:600}}> + Devir: {fmt(mg.carryOver)}</span>}
                     {" · "}Kira: {fmt(mg.livingCost)}
                     {" · "}
                     {mg.surplus>0
                       ? <span style={{color:"#27ae60",fontWeight:700}}>💰 Serbest: {fmt(mg.surplus)}</span>
-                      : <span style={{color:"#e74c3c",fontWeight:700}}>⚠️ Açık: {fmt(Math.abs(mg.surplus))}</span>
-                    }
+                      : <span style={{color:"#e74c3c",fontWeight:700}}>⚠️ Açık: {fmt(Math.abs(mg.surplus))}</span>}
                   </div>
                 </div>
-                <div style={{textAlign:"right"}}>
+                <div style={{textAlign:"right",marginRight:6}}>
                   <div style={{fontSize:15,fontWeight:800,color:"#c0392b"}}>{fmt(mg.total)}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>toplam ödeme</div>
+                  <div style={{fontSize:9,color:"#aaa"}}>{isExpanded?"▲ gizle":"▼ detay"}</div>
                 </div>
               </div>
-              {(mg.additions||[]).length>0&&<div style={{background:"#fff8e1",borderRadius:8,padding:"7px 10px",marginBottom:6,fontSize:11,color:"#f57f17"}}>
-                ⚠️ Bu ay kart borcuna eklendi: {(mg.additions||[]).map(a=>`${a.debtName} +${new Intl.NumberFormat("tr-TR").format(a.amount)}₺`).join(" · ")}
+
+              {/* DETAY — açıksa görünür */}
+              {isExpanded&&<div style={{marginTop:10}}>
+                {(mg.additions||[]).length>0&&<div style={{background:"#fff8e1",borderRadius:8,padding:"7px 10px",marginBottom:6,fontSize:11,color:"#f57f17"}}>
+                  ⚠️ Bu ay kart borcuna eklendi: {(mg.additions||[]).map(a=>`${a.debtName} +${new Intl.NumberFormat("tr-TR").format(a.amount)}₺`).join(" · ")}
+                </div>}
+                {mg.payments.map((p,pi)=>{
+                  const icon=p.type==="kredi"?"🏦":p.type==="kmh"?"🏦":"💳";
+                  const bg=p.type==="kredi"?"#e3f2fd":p.type==="kmh"?"#f3e8fd":"#fff8f0";
+                  const typeLabel=p.type==="kredi"?"Kredi":p.type==="kmh"?"KMH":"KK";
+                  return <div key={pi} style={{display:"flex",alignItems:"flex-start",padding:"7px 6px",borderRadius:8,marginBottom:2,background:p.finished?"#f0fff4":bg,gap:8,opacity:p.payment===0?0.4:1}}>
+                    <div style={{fontSize:17,marginTop:1}}>{p.finished?"✅":icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:12,fontWeight:600}}>{p.name} <span style={{fontSize:9,fontWeight:700,opacity:.7}}>[{typeLabel}]</span>{p.finished&&<span style={{fontSize:10,color:"#27ae60",marginLeft:6,fontWeight:700}}>KAPANDI 🎉</span>}</div>
+                      {p.type!=="kredi"&&<div style={{fontSize:10,color:"#aaa",marginTop:1}}>
+                        Faiz: <span style={{color:"#e67e22",fontWeight:600}}>{fmt(p.interest)}</span> · Ana: <span style={{color:"#27ae60",fontWeight:600}}>{fmt(p.principal)}</span> · Kalan: {fmt(p.remaining)}
+                      </div>}
+                    </div>
+                    <div style={{fontSize:14,fontWeight:800,flexShrink:0}}>{fmt(p.payment)}</div>
+                  </div>;
+                })}
+                <div style={{marginTop:8,paddingTop:8,borderTop:"2px solid #f0f0f0",display:"flex",justifyContent:"space-between",fontSize:11}}>
+                  <span style={{color:"#888"}}>Toplam ödeme</span><span style={{fontWeight:800,color:"#c0392b"}}>{fmt(mg.total)}</span>
+                </div>
               </div>}
-              {mg.payments.map((p,pi)=>{
-                const icon=p.type==="kredi"?"🏦":p.type==="kmh"?"🏦":"💳";
-                const bg=p.type==="kredi"?"#e3f2fd":p.type==="kmh"?"#f3e8fd":"#fff8f0";
-                const typeLabel=p.type==="kredi"?"Kredi":p.type==="kmh"?"KMH":"KK";
-                return <div key={pi} style={{display:"flex",alignItems:"flex-start",padding:"7px 6px",borderRadius:8,marginBottom:2,background:p.finished?"#f0fff4":bg,gap:8,opacity:p.payment===0?0.4:1}}>
-                  <div style={{fontSize:17,marginTop:1}}>{p.finished?"✅":icon}</div>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:12,fontWeight:600}}>{p.name} <span style={{fontSize:9,fontWeight:700,opacity:.7}}>[{typeLabel}]</span>{p.finished&&<span style={{fontSize:10,color:"#27ae60",marginLeft:6,fontWeight:700}}>KAPANDI 🎉</span>}</div>
-                    {p.type!=="kredi"&&<div style={{fontSize:10,color:"#aaa",marginTop:1}}>
-                      Faiz: <span style={{color:"#e67e22",fontWeight:600}}>{fmt(p.interest)}</span> · Ana: <span style={{color:"#27ae60",fontWeight:600}}>{fmt(p.principal)}</span> · Kalan: {fmt(p.remaining)}
-                    </div>}
-                  </div>
-                  <div style={{fontSize:14,fontWeight:800,flexShrink:0}}>{fmt(p.payment)}</div>
-                </div>;
-              })}
-              <div style={{marginTop:8,paddingTop:8,borderTop:"2px solid #f0f0f0",display:"flex",justifyContent:"space-between",fontSize:11}}>
-                <span style={{color:"#888"}}>Toplam ödeme</span><span style={{fontWeight:800,color:"#c0392b"}}>{fmt(mg.total)}</span>
-              </div>
             </Card>
-          ))}
+            );
+          })}
           <button onClick={()=>setShowFullPlan(v=>!v)} style={{...btnS("#2c3e50"),marginBottom:12}}>
             {showFullPlan?`▲ Daha Az Göster`:`▼ Tüm Planı Göster (${cascadePlans[selectedStrategy].length} ay)`}
           </button>
