@@ -221,7 +221,7 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
     let sorted;
     if(strategy === "avalanche") sorted = [...flex].sort((a,b) => b.rate - a.rate || b.rem - a.rem);
     else if(strategy === "snowball") sorted = [...flex].sort((a,b) => a.rem - b.rem);
-    else sorted = [...flex]; // minimum
+    else sorted = [...flex];
 
     // Ödeme dağıtımı
     const pays = {};
@@ -230,6 +230,14 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
     if(strategy === "minimum"){
       sorted.forEach(d => {
         pays[d.id] = Math.min(Math.ceil(d.rem * 0.20), d.rem);
+      });
+    } else if(strategy === "manuel"){
+      // Manuel: her borcun userPayment'ını kullan (en az min)
+      sorted.forEach(d => {
+        const interest = Math.round(d.rem * d.rate / 100);
+        const minPay = Math.min(Math.ceil(d.rem * 0.20) + interest, d.rem + interest);
+        const manual = d.userPayment ? d.userPayment + interest : minPay;
+        pays[d.id] = Math.min(Math.max(manual, minPay), d.rem + interest);
       });
     } else {
       // 1) Herkese minimum öde
@@ -241,11 +249,11 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
         rem -= pays[d.id];
       });
       rem = Math.max(0, rem);
-      // 2) Kalan nakiti stratejiye göre öncelikli borca ver (faiz dahil tam kapatma tutarı)
+      // 2) Kalan nakiti stratejiye göre öncelikli borca ver
       for(let i = 0; i < sorted.length && rem > 0; i++){
         const d = sorted[i];
         const interest = Math.round(d.rem * d.rate / 100);
-        const fullPayoff = d.rem + interest; // Borcu tamamen kapatmak için gereken
+        const fullPayoff = d.rem + interest;
         const add = Math.min(rem, fullPayoff - pays[d.id]);
         if(add > 0){ pays[d.id] += add; rem -= add; }
       }
@@ -603,6 +611,7 @@ function App(){
     avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp),
     snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
     minimum:   buildCascadePlan(debts, salary, incomes, "minimum",   livingForPlan, recurringExp),
+    manuel:    buildCascadePlan(debts, salary, incomes, "manuel",    livingForPlan, recurringExp),
   }),[debts, salary, incomes, livingForPlan]);
 
   const scenarios=useMemo(()=>{
@@ -1703,56 +1712,54 @@ Türkçe, samimi, max 350 kelime.`;
             <div style={{fontSize:15,fontWeight:800,marginBottom:4}}>📅 Aylık Ödeme Planım</div>
             <div style={{fontSize:11,opacity:.75,lineHeight:1.7}}>Krediler <strong>sabit</strong>, kredi kartı &amp; KMH <strong>senin belirlediğin tutarla</strong>.</div>
           </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>✏️ Esnek Ödeme Tutarlarım</div>
-            {debts.filter(d=>d.type!=="kredi").map(d=>{
-              const pl=buildFlexPlan(d);
-              const totInt=pl.reduce((s,r)=>s+r.interest,0);
-              return <div key={d.id} style={{background:"#f9f9f9",borderRadius:12,padding:"10px 12px",marginBottom:8}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                  <div><div style={{fontSize:12,fontWeight:700}}>{d.name}</div><div style={{fontSize:10,color:"#aaa"}}>{fmt(d.remaining)} · %{d.rate}</div></div>
-                  <TBadge type={d.type}/>
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <input type="number" value={d.userPayment||d.monthly} onChange={e=>updateUserPayment(d.id,e.target.value)} style={{...inp,marginBottom:0,flex:1,fontWeight:700,fontSize:14,textAlign:"right",background:"#fff"}}/>
-                  <span style={{fontSize:12,color:"#888"}}>₺/ay</span>
-                </div>
-                <div style={{display:"flex",justifyContent:"space-between",marginTop:6,fontSize:10,color:"#888"}}>
-                  <span>📆 {pl.length} ay ({pl[pl.length-1]?.label})</span>
-                  <span style={{color:"#e67e22"}}>Faiz: {fmt(totInt)}</span>
-                </div>
-              </div>;
-            })}
-          </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10}}>🏦 Sabit Taksitli Krediler</div>
-            {debts.filter(d=>d.type==="kredi").map(d=>(
-              <div key={d.id} style={{display:"flex",justifyContent:"space-between",padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <div><div style={{fontSize:12,fontWeight:600}}>{d.name}</div><div style={{fontSize:10,color:"#aaa"}}>Her ay {d.payDay}. · {d.months} ay kaldı</div></div>
-                <div style={{textAlign:"right"}}><div style={{fontSize:13,fontWeight:800,color:"#2980b9"}}>{fmt(d.monthly)}</div><div style={{fontSize:10,color:"#aaa"}}>sabit</div></div>
-              </div>
-            ))}
-          </Card>
-          {/* Yaşam gideri ayarı */}
-          <Card style={{padding:"10px 14px",marginBottom:8}}>
-            <div style={{display:"flex",alignItems:"center",gap:10}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>🏠 Kira (Sabit Gider)</div>
-                <div style={{fontSize:10,color:"#888"}}>Gelirden düşülecek kira tutarı — diğer harcamalar giderler bölümüne</div>
-              </div>
-              <input type="number" value={planLiving} onChange={e=>setPlanLiving(Number(e.target.value))}
-                style={{width:110,border:"1.5px solid #ddd",borderRadius:8,padding:"6px 8px",fontSize:13,textAlign:"right",fontFamily:"'Sora',sans-serif"}}/>
-              <span style={{fontSize:11,color:"#888"}}>₺</span>
-
-            </div>
-          </Card>
-          {/* Strateji seçici */}
-          <div style={{display:"flex",gap:6,marginBottom:12}}>
-            {[["avalanche","🏔 Avalanche","#2980b9"],["snowball","⛄ Snowball","#8e44ad"],["minimum","🐢 Minimum","#e74c3c"]].map(([s,l,c])=>(
+          {/* Strateji seçici + Manuel butonu */}
+          <div style={{display:"flex",gap:6,marginBottom:8}}>
+            {[["avalanche","🏔 Aval.","#2980b9"],["snowball","⛄ Snow.","#8e44ad"],["minimum","🐢 Min.","#e74c3c"],["manuel","✏️ Manuel","#27ae60"]].map(([s,l,c])=>(
               <button key={s} onClick={()=>setSelectedStrategy(s)} style={{flex:1,padding:"8px 4px",fontSize:11,fontWeight:700,border:`2px solid ${selectedStrategy===s?c:"#eee"}`,borderRadius:10,background:selectedStrategy===s?c:"#fff",color:selectedStrategy===s?"#fff":"#888",cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
                 {l}
               </button>
             ))}
+          </div>
+
+          {/* Manuel giriş paneli */}
+          {selectedStrategy==="manuel"&&<Card style={{marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700}}>✏️ Manuel Ödeme Tutarları</div>
+              <div style={{fontSize:10,color:"#888"}}>Bu ay için kendin belirle</div>
+            </div>
+            {debts.filter(d=>d.type!=="kredi").map(d=>{
+              const minPay=Math.ceil(d.remaining*0.20);
+              const isLow=(d.userPayment||0)<minPay;
+              return <div key={d.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 0",borderBottom:"1px solid #f5f5f5"}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:5}}>
+                    {d.name}<TBadge type={d.type}/>
+                  </div>
+                  <div style={{fontSize:10,color:"#aaa"}}>{fmt(d.remaining)} · Min: {fmt(minPay)}</div>
+                </div>
+                <input type="number" value={d.userPayment||minPay} onChange={e=>updateUserPayment(d.id,e.target.value)}
+                  style={{width:90,border:`2px solid ${isLow?"#e74c3c":"#ddd"}`,borderRadius:8,padding:"6px 8px",fontSize:13,fontWeight:700,textAlign:"right",fontFamily:"'Sora',sans-serif",color:isLow?"#e74c3c":"#1a1a2e"}}/>
+                <span style={{fontSize:11,color:"#aaa",flexShrink:0}}>₺</span>
+              </div>;
+            })}
+            {debts.filter(d=>d.type==="kredi").map(d=>(
+              <div key={d.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #f5f5f5",opacity:.6}}>
+                <div style={{fontSize:12,fontWeight:600}}>{d.name} <span style={{fontSize:10,color:"#888"}}>[Sabit]</span></div>
+                <span style={{fontSize:13,fontWeight:800,color:"#2980b9"}}>{fmt(d.monthly)}₺</span>
+              </div>
+            ))}
+            <div style={{marginTop:10,padding:"8px 10px",background:"#f0fff4",borderRadius:8,display:"flex",justifyContent:"space-between",fontSize:12}}>
+              <span style={{color:"#555",fontWeight:600}}>Toplam aylık ödeme</span>
+              <span style={{fontWeight:800,color:"#27ae60"}}>{fmt(debts.reduce((s,d)=>s+(d.type==="kredi"?d.monthly:(d.userPayment||Math.ceil(d.remaining*0.20))),0))}</span>
+            </div>
+          </Card>}
+
+          {/* Kira ayarı — kompakt */}
+          <div style={{display:"flex",alignItems:"center",gap:8,background:"#fff",border:"1.5px solid #eee",borderRadius:10,padding:"8px 12px",marginBottom:8}}>
+            <span style={{fontSize:12,fontWeight:700,flex:1}}>🏠 Kira</span>
+            <input type="number" value={planLiving} onChange={e=>setPlanLiving(Number(e.target.value))}
+              style={{width:100,border:"1.5px solid #ddd",borderRadius:8,padding:"5px 8px",fontSize:13,textAlign:"right",fontFamily:"'Sora',sans-serif"}}/>
+            <span style={{fontSize:11,color:"#888"}}>₺</span>
           </div>
 
           {/* Cascade takvim */}
