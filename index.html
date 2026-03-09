@@ -367,7 +367,7 @@ function calcSmart(debts,income,living){
 
 // ── COMPONENTS ──────────────────────────────────────────────────────────────
 function Tab({label,active,onClick,badge}){
-  return <button onClick={onClick} style={{flex:1,padding:"9px 2px",border:"none",background:"none",color:active?"#1a1a2e":"#8892a4",fontWeight:active?"700":"500",fontSize:"10.5px",cursor:"pointer",position:"relative",borderBottom:active?"2px solid #c0392b":"2px solid transparent",transition:"all 0.2s",fontFamily:"'Sora',sans-serif"}}>
+  return <button onClick={onClick} style={{flex:1,padding:"11px 2px",border:"none",background:"none",color:active?"#1a1a2e":"#8892a4",fontWeight:active?"700":"500",fontSize:"13px",cursor:"pointer",position:"relative",borderBottom:active?"2.5px solid #c0392b":"2.5px solid transparent",transition:"all 0.2s",fontFamily:"'Sora',sans-serif"}}>
     {label}
     {badge!=null&&<span style={{position:"absolute",top:5,right:"8%",background:"#c0392b",color:"#fff",borderRadius:"50%",width:14,height:14,fontSize:8,display:"flex",alignItems:"center",justifyContent:"center"}}>{badge}</span>}
   </button>;
@@ -580,6 +580,8 @@ function App(){
   },[expenses,activeRecurring,curMonth]);
 
   // Sabit gider kaydet
+
+
   function saveRecurring(){
     const finalCat=rForm.category==="__new__"?(rForm.customCatName||"").trim():rForm.category;
     if(!finalCat||!rForm.amount)return;
@@ -639,6 +641,48 @@ function App(){
   }).filter(Boolean).sort((a,b)=>a.isPaid-b.isPaid||a.diffDays-b.diffDays);
   // Geriye uyumluluk için cardAlerts da tut
   const cardAlerts=[];
+
+  // ── ÖDEME GÜNÜ BİLDİRİMİ ──────────────────────────────────────────
+  useEffect(()=>{
+    if("Notification" in window && Notification.permission==="default"){
+      Notification.requestPermission();
+    }
+    function fireNotifs(){
+      const n=new Date();
+      const key="ft_notif_"+n.toISOString().slice(0,10);
+      if(localStorage.getItem(key)) return;
+      const due=paymentAlerts.filter(a=>!a.isPaid&&a.diffDays===0);
+      if(due.length===0) return;
+      if("Notification" in window && Notification.permission==="granted"){
+        due.forEach(a=>{
+          new Notification("💳 Ödeme Günü!", {
+            body:a.name+" ("+(a.type==="kredi_karti"?"KK":a.type==="kmh"?"KMH":"Kredi")+") — "+new Intl.NumberFormat("tr-TR").format(a.amt)+"₺ bugün ödenmeli!",
+            tag:"pay_"+a.id, requireInteraction:true
+          });
+        });
+      }
+      try{
+        const ctx=new(window.AudioContext||window.webkitAudioContext)();
+        [523,659,784,1047].forEach(function(f,i){
+          const o=ctx.createOscillator(),g=ctx.createGain();
+          o.connect(g);g.connect(ctx.destination);
+          o.frequency.value=f;o.type="sine";
+          const t=ctx.currentTime+i*0.18;
+          g.gain.setValueAtTime(0.3,t);
+          g.gain.exponentialRampToValueAtTime(0.001,t+0.3);
+          o.start(t);o.stop(t+0.35);
+        });
+      }catch(e){}
+      localStorage.setItem(key,"1");
+    }
+    const now=new Date();
+    if(now.getHours()>=11) setTimeout(fireNotifs,2000);
+    const iv=setInterval(function(){
+      const t=new Date();
+      if(t.getHours()===11&&t.getMinutes()===0) fireNotifs();
+    },60000);
+    return function(){clearInterval(iv);};
+  },[paymentAlerts.length]);
 
   // Master ödeme planı
   function masterPlan(){
@@ -835,6 +879,8 @@ function App(){
   // ── SES İLE HARCAMA ──────────────────────────────────────────────────────
   const [toast, setToast] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(true);
+  const [durumunOpen, setDurumunOpen] = useState(true);
+  const [recurringOpen, setRecurringOpen] = useState(true);
   function showToast(msg, color="#27ae60"){
     setToast({msg, color});
     setTimeout(()=>setToast(null), 3000);
@@ -1322,76 +1368,7 @@ Türkçe, samimi, max 350 kelime.`;
           {toast.msg}
         </div>}
 
-        {/* Ödeme Uyarıları — KMH + KK + Kredi */}
-        {paymentAlerts.length>0&&<div style={{marginBottom:8}}>
-          {/* Başlık — aç/kapa */}
-          <div onClick={()=>setAlertsOpen(p=>!p)}
-            style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-              background:paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=2)?"#fff0f0":paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=7)?"#fffbf0":"#f8f9ff",
-              border:`1.5px solid ${paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=2)?"#e74c3c":paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=7)?"#f39c12":"#c5cae9"}`,
-              borderRadius:alertsOpen?"12px 12px 0 0":12,padding:"10px 13px",cursor:"pointer",marginBottom:0}}>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:14}}>{paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=2)?"🚨":paymentAlerts.some(a=>!a.isPaid&&a.diffDays<=7)?"⚠️":"📅"}</span>
-              <span style={{fontSize:12,fontWeight:700}}>
-                Yaklaşan Ödemeler
-                <span style={{marginLeft:6,background:"#c0392b",color:"#fff",borderRadius:20,padding:"1px 7px",fontSize:10}}>
-                  {paymentAlerts.filter(a=>!a.isPaid).length}
-                </span>
-                {paymentAlerts.some(a=>a.isPaid)&&<span style={{marginLeft:4,background:"#27ae60",color:"#fff",borderRadius:20,padding:"1px 7px",fontSize:10}}>
-                  ✓ {paymentAlerts.filter(a=>a.isPaid).length} ödendi
-                </span>}
-              </span>
-            </div>
-            <span style={{fontSize:12,color:"#aaa"}}>{alertsOpen?"▲":"▼"}</span>
-          </div>
-          {/* Liste */}
-          {alertsOpen&&<div style={{border:"1.5px solid #e0e0e0",borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden"}}>
-            {paymentAlerts.map((a,idx)=>{
-              const isUrgent=!a.isPaid&&a.diffDays<=2;
-              const isSoon=!a.isPaid&&a.diffDays<=7;
-              const bg=a.isPaid?"#f0fff4":isUrgent?"#fff0f0":isSoon?"#fffbf0":"#fafbff";
-              const accentColor=a.isPaid?"#27ae60":isUrgent?"#c0392b":isSoon?"#d68910":"#2980b9";
-              const urgencyLabel=a.isPaid?"✓ Ödendi":a.diffDays===0?"BUGÜN!":a.diffDays===1?"Yarın!":a.diffDays+" gün";
-              return <div key={a.id} style={{background:bg,padding:"10px 13px",borderBottom:idx<paymentAlerts.length-1?"1px solid #f0f0f0":"none",
-                display:"flex",justifyContent:"space-between",alignItems:"center",opacity:a.isPaid?.7:1}}>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
-                    <span>{a.icon}</span>
-                    <span style={{fontSize:12,fontWeight:700,color:a.isPaid?"#27ae60":"#1a1a2e",textDecoration:a.isPaid?"line-through":"none"}}>{a.name}</span>
-                    <span style={{fontSize:9,background:a.type==="kredi_karti"?"#fdf3e8":a.type==="kmh"?"#f3e8fd":"#e8f4fd",color:a.type==="kredi_karti"?"#e67e22":a.type==="kmh"?"#8e44ad":"#2980b9",borderRadius:20,padding:"1px 7px",fontWeight:700,flexShrink:0}}>{a.type==="kredi_karti"?"KK":a.type==="kmh"?"KMH":"Kredi"}</span>
-                    <span style={{fontSize:10,background:accentColor,color:"#fff",borderRadius:20,padding:"1px 7px",fontWeight:700}}>{urgencyLabel}</span>
-                  </div>
-                  <div style={{fontSize:11,color:"#888"}}>
-                    {a.payDate.toLocaleDateString("tr-TR",{day:"numeric",month:"long"})}
-                    <span style={{fontWeight:700,color:accentColor,marginLeft:6}}>{new Intl.NumberFormat("tr-TR").format(a.amt)}₺</span>
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:5,flexShrink:0}}>
-                  {!a.isPaid
-                    ? <>
-                        <button onClick={()=>markPaid(a)}
-                          style={{background:"#fdf0f0",color:"#c0392b",border:"1.5px solid #e74c3c",borderRadius:8,padding:"5px 10px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
-                          🔴 Ödenecek
-                        </button>
-                        <button onClick={()=>{setChatInput(`${a.fullName} için ${a.diffDays===0?"bugün":a.diffDays+" gün içinde"} ${new Intl.NumberFormat("tr-TR").format(a.amt)}₺ ödeme var. Planımı etkiler mi?`);setTab("ai");}}
-                          style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:8,padding:"5px 8px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:700}}>
-                          🤖
-                        </button>
-                      </>
-                    : <div style={{display:"flex",gap:5}}>
-                        <span style={{background:"#e8f5e9",color:"#27ae60",border:"1.5px solid #27ae60",borderRadius:8,padding:"5px 10px",fontSize:10,fontWeight:700,display:"flex",alignItems:"center",gap:4}}>
-                          ✅ Ödendi
-                        </span>
-                        <button onClick={()=>unmarkPaid(a)}
-                          style={{background:"#f5f5f5",color:"#888",border:"1px solid #ddd",borderRadius:8,padding:"5px 8px",fontSize:10,cursor:"pointer",fontFamily:"'Sora',sans-serif"}}>
-                          ↩️
-                        </button>
-                      </div>}
-                </div>
-              </div>;
-            })}
-          </div>}
-        </div>}
+
 
         <div style={{display:"flex",gap:8,marginBottom:12}}>
           <div style={{flex:1,background:"rgba(255,255,255,.1)",borderRadius:14,padding:"10px 12px"}}>
@@ -1431,48 +1408,136 @@ Türkçe, samimi, max 350 kelime.`;
 
         {/* ══ ÖZET ═══════════════════════════════════════════════════════ */}
         {tab==="ozet"&&<>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>Borç Dağılımı</div>
-            <PieChart data={pieData} colors={COLORS}/>
-            <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10}}>
-              {debts.map((d,i)=><div key={d.id} style={{display:"flex",alignItems:"center",gap:4,fontSize:11}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:COLORS[i%COLORS.length]}}/>
-                <span style={{color:"#666"}}>{d.name.split(" ").slice(0,3).join(" ")}</span>
-              </div>)}
+          <Card style={{padding:0,overflow:"hidden"}}>
+            {/* Başlık — tıkla aç/kapa */}
+            <div onClick={()=>setDurumunOpen(p=>!p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",cursor:"pointer"}}>
+              <span style={{fontSize:13,fontWeight:700,color:"#1a1a2e"}}>📊 Durumun</span>
+              <span style={{fontSize:12,color:"#aaa",fontWeight:700}}>{durumunOpen?"▲":"▼"}</span>
             </div>
-          </Card>
-          <Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>6 Aylık Borç Tahmini</div>
-            <LineChartSimple data={chartData}/>
+            {durumunOpen&&<div style={{padding:"0 14px 14px"}}>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <PieChart data={pieData} colors={COLORS}/>
+                <div style={{display:"flex",flexWrap:"wrap",gap:"3px 8px",flex:1,minWidth:0,alignContent:"center"}}>
+                  {debts.map((d,i)=>(
+                    <div key={d.id} style={{display:"flex",alignItems:"center",gap:3,width:"calc(50% - 4px)"}}>
+                      <div style={{width:7,height:7,borderRadius:"50%",background:COLORS[i%COLORS.length],flexShrink:0}}/>
+                      <div style={{minWidth:0}}>
+                        <div style={{fontSize:8.5,fontWeight:700,color:"#444",lineHeight:1.2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{d.name.replace("K.Kartı - ","KK ").replace("KMH - ","KMH ").replace("Garanti Kredi","Gar.Kr.")}</div>
+                        <div style={{fontSize:7.5,color:"#aaa",lineHeight:1}}>{new Intl.NumberFormat("tr-TR",{notation:"compact",maximumFractionDigits:0}).format(d.remaining)}₺</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <LineChartSimple data={chartData}/>
+            </div>}
           </Card>
 
           {/* Kredi kartı kesim/son ödeme özeti */}
-          {creditCards.some(c=>c.kesimGunu)&&<Card>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"#1a1a2e"}}>🗓 Kredi Kartı Tarihleri</div>
-            {creditCards.map(c=>(
-              <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #f5f5f5"}}>
-                <div>
-                  <div style={{fontSize:12,fontWeight:600}}>{c.name}</div>
-                  <div style={{fontSize:10,color:"#aaa"}}>
-                    {c.kesimGunu?`Kesim: Ayın ${c.kesimGunu}.`:""} {c.sonOdemeGunu?`Son Ödeme: Ayın ${c.sonOdemeGunu}.`:""}
-                  </div>
+          {/* ÖDEMELERİM */}
+          {paymentAlerts.length>0&&(()=>{
+            const unpaid = paymentAlerts.filter(a=>!a.isPaid).sort((a,b)=>a.diffDays-b.diffDays);
+            const paid   = paymentAlerts.filter(a=>a.isPaid);
+            const sorted = [...unpaid,...paid];
+            const hasUrgent = unpaid.some(a=>a.diffDays<=2);
+            const hasSoon   = unpaid.some(a=>a.diffDays<=7);
+            const headerBg  = hasUrgent?"#fff0f0":hasSoon?"#fffbf0":"#f4f6ff";
+            const headerBorder = hasUrgent?"#e74c3c":hasSoon?"#f39c12":"#7986cb";
+            const headerIcon = hasUrgent?"🚨":hasSoon?"⚠️":"📅";
+            return <div style={{marginBottom:8}}>
+              {/* Başlık — tıklayınca aç/kapa */}
+              <div onClick={()=>setAlertsOpen(p=>!p)} style={{
+                display:"flex",justifyContent:"space-between",alignItems:"center",
+                background:headerBg,border:`1.5px solid ${headerBorder}`,
+                borderRadius:alertsOpen?"12px 12px 0 0":12,
+                padding:"11px 14px",cursor:"pointer"
+              }}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:16}}>{headerIcon}</span>
+                  <span style={{fontSize:13,fontWeight:800,color:"#1a1a2e"}}>Ödemelerim</span>
+                  {unpaid.length>0&&<span style={{background:"#e74c3c",color:"#fff",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>
+                    {unpaid.length} bekliyor
+                  </span>}
+                  {paid.length>0&&<span style={{background:"#27ae60",color:"#fff",borderRadius:20,padding:"2px 8px",fontSize:10,fontWeight:700}}>
+                    ✓ {paid.length} ödendi
+                  </span>}
                 </div>
-                <div style={{textAlign:"right"}}>
-                  {(()=>{
-                    const p = cascadeThisMonth?.payments?.find(p=>p.id===c.id);
-                    const amt = p ? p.payment : (c.userPayment||c.monthly);
-                    return <>
-                      <div style={{fontSize:13,fontWeight:700,color:"#c0392b"}}>{fmt(amt)}</div>
-                      <div style={{fontSize:10,color:"#aaa"}}>{p?"bu ay planı":"aylık ödeme"}</div>
-                    </>;
-                  })()}
-                </div>
+                <span style={{fontSize:13,color:"#aaa",fontWeight:700}}>{alertsOpen?"▲":"▼"}</span>
               </div>
-            ))}
-          </Card>}
-          <div style={{textAlign:"right",marginBottom:12}}>
-            <span onClick={exportExcel} style={{fontSize:12,color:"#27ae60",cursor:"pointer",fontWeight:600}}>📊 Excel'e Aktar →</span>
-          </div>
+
+              {/* İçerik */}
+              {alertsOpen&&<div style={{border:`1.5px solid ${headerBorder}`,borderTop:"none",borderRadius:"0 0 12px 12px",overflow:"hidden",background:"#fff"}}>
+                {sorted.map((a,idx)=>{
+                  const isUrgent = !a.isPaid&&a.diffDays<=2;
+                  const isSoon   = !a.isPaid&&a.diffDays<=7;
+                  const rowBg    = a.isPaid?"#f0fff4":isUrgent?"#fff5f5":isSoon?"#fffdf0":"#fafbff";
+                  const accent   = a.isPaid?"#27ae60":isUrgent?"#c0392b":isSoon?"#d68910":"#2980b9";
+                  const dayLabel = a.isPaid?"":a.diffDays===0?"BUGÜN!":a.diffDays===1?"Yarın!":a.diffDays+" gün";
+                  return <div key={a.id} style={{
+                    background:rowBg,
+                    padding:"11px 14px",
+                    borderBottom:idx<sorted.length-1?"1px solid #f0f0f0":"none",
+                    display:"flex",justifyContent:"space-between",alignItems:"center",
+                    opacity:a.isPaid?0.75:1
+                  }}>
+                    {/* Sol */}
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3,flexWrap:"wrap"}}>
+                        <span style={{fontSize:15}}>{a.icon}</span>
+                        <span style={{fontSize:12,fontWeight:700,color:a.isPaid?"#27ae60":"#1a1a2e",
+                          textDecoration:a.isPaid?"line-through":"none"}}>{a.name}</span>
+                        <span style={{fontSize:9,padding:"1px 7px",borderRadius:20,fontWeight:700,
+                          background:a.type==="kredi_karti"?"#fdf3e8":a.type==="kmh"?"#f3e8fd":"#e8f4fd",
+                          color:a.type==="kredi_karti"?"#e67e22":a.type==="kmh"?"#8e44ad":"#2980b9"}}>
+                          {a.type==="kredi_karti"?"KK":a.type==="kmh"?"KMH":"Kredi"}
+                        </span>
+                        {dayLabel&&<span style={{fontSize:9,padding:"1px 7px",borderRadius:20,fontWeight:700,
+                          background:accent,color:"#fff"}}>{dayLabel}</span>}
+                      </div>
+                      <div style={{fontSize:11,color:"#888"}}>
+                        {a.payDate.toLocaleDateString("tr-TR",{day:"numeric",month:"long"})}
+                        <span style={{fontWeight:800,color:accent,marginLeft:6}}>
+                          {new Intl.NumberFormat("tr-TR").format(a.amt)}₺
+                        </span>
+                      </div>
+                    </div>
+                    {/* Sağ — buton */}
+                    <div style={{display:"flex",gap:5,flexShrink:0,marginLeft:8}}>
+                      {!a.isPaid
+                        ? <>
+                            <button onClick={()=>markPaid(a)} style={{
+                              background:"#fdf0f0",color:"#c0392b",
+                              border:"1.5px solid #e74c3c",borderRadius:9,
+                              padding:"6px 11px",fontSize:11,cursor:"pointer",
+                              fontFamily:"'Sora',sans-serif",fontWeight:700
+                            }}>🔴 Ödenecek</button>
+                            <button onClick={()=>{setChatInput(`${a.fullName} için ${a.diffDays===0?"bugün":a.diffDays+" gün içinde"} ${new Intl.NumberFormat("tr-TR").format(a.amt)}₺ ödeme var. Planımı etkiler mi?`);setTab("ai");}} style={{
+                              background:"#f0f4ff",color:"#2980b9",
+                              border:"1px solid #d0e0ff",borderRadius:9,
+                              padding:"6px 9px",fontSize:11,cursor:"pointer",
+                              fontFamily:"'Sora',sans-serif",fontWeight:700
+                            }}>🤖</button>
+                          </>
+                        : <>
+                            <span style={{
+                              background:"#e8f5e9",color:"#27ae60",
+                              border:"1.5px solid #27ae60",borderRadius:9,
+                              padding:"6px 11px",fontSize:11,fontWeight:700,
+                              display:"flex",alignItems:"center",gap:4
+                            }}>✅ Ödendi</span>
+                            <button onClick={()=>unmarkPaid(a)} style={{
+                              background:"#f5f5f5",color:"#888",
+                              border:"1px solid #ddd",borderRadius:9,
+                              padding:"6px 9px",fontSize:11,cursor:"pointer",
+                              fontFamily:"'Sora',sans-serif"
+                            }}>↩️</button>
+                          </>}
+                    </div>
+                  </div>;
+                })}
+              </div>}
+            </div>;
+          })()}
         </>}
 
         {/* ══ GELİRLER ════════════════════════════════════════════════════ */}
@@ -2061,37 +2126,60 @@ Türkçe, samimi, max 350 kelime.`;
             </div>
           </Card>}
 
-          {/* Aktif sabit giderler özeti */}
-          {activeRecurring.length>0&&<Card style={{border:"1px solid #e8d5f5"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
-              <div><div style={{fontSize:13,fontWeight:700,color:"#8e44ad"}}>🔄 Sabit Giderlerim</div>
-              <div style={{fontSize:10,color:"#aaa"}}>Bu ay otomatik eklendi</div></div>
-              <div style={{fontSize:14,fontWeight:800,color:"#8e44ad"}}>{fmt(activeRecurring.reduce((s,r)=>s+r.amount,0))}</div>
-            </div>
-            {recurringExp.map(r=>{
-              const start=new Date(r.startDate);
-              const startMonth=start.getFullYear()*12+start.getMonth();
-              const nowMonth=new Date().getFullYear()*12+new Date().getMonth();
-              const elapsed=nowMonth-startMonth;
-              const remaining=r.totalMonths-elapsed;
-              const isActive=elapsed>=0&&elapsed<r.totalMonths;
-              return <div key={r.id} style={{display:"flex",alignItems:"center",gap:10,padding:"9px 10px",borderRadius:10,marginBottom:6,background:isActive?"#f9f0ff":"#fafafa",border:isActive?"1px solid #d7bef5":"1px solid #eee",opacity:isActive?1:0.5}}>
-                <div style={{fontSize:20}}>{r.icon}</div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:700}}>{r.category}</div>
-                  <div style={{fontSize:10,color:"#888"}}>Her ayın {r.dayOfMonth}. · {isActive?`${elapsed+1}/${r.totalMonths} ay · ${remaining} ay kaldı`:"Tamamlandı"}</div>
-                  {r.note&&<div style={{fontSize:10,color:"#b39ddb",fontStyle:"italic"}}>{r.note}</div>}
+          {/* Sabit Giderlerim — açılır/kapanır */}
+          {recurringExp.length>0&&(()=>{
+            const MNAMES2=["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
+            const nowMonth2=new Date().getMonth();
+            return <Card style={{padding:0,overflow:"hidden",border:"1px solid #e8d5f5"}}>
+              {/* Başlık */}
+              <div onClick={()=>setRecurringOpen(p=>!p)} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px",cursor:"pointer",background:"#faf5ff"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:13,fontWeight:700,color:"#8e44ad"}}>🔄 Sabit Giderlerim</span>
+                  <span style={{fontSize:10,background:"#8e44ad",color:"#fff",borderRadius:20,padding:"1px 7px",fontWeight:700}}>{recurringExp.length}</span>
+                  {activeRecurring.length>0&&<span style={{fontSize:10,color:"#8e44ad",fontWeight:600}}>{fmt(activeRecurring.reduce((s,r)=>s+r.amount,0))}/ay</span>}
                 </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{fontSize:13,fontWeight:800,color:"#8e44ad"}}>{fmt(r.amount)}</div>
-                  <div style={{display:"flex",gap:4,marginTop:3}}>
-                    <button onClick={()=>{setRForm({category:r.category,icon:r.icon,amount:r.amount,dayOfMonth:r.dayOfMonth,startDate:r.startDate,totalMonths:r.totalMonths,payMethod:r.payMethod,cardId:r.cardId||"",note:r.note||""});setEditRecurringId(r.id);setShowAddRecurring(true);}} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>✏️</button>
-                    <button onClick={()=>deleteRecurring(r.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>🗑</button>
-                  </div>
-                </div>
-              </div>;
-            })}
-          </Card>}
+                <span style={{fontSize:12,color:"#aaa",fontWeight:700}}>{recurringOpen?"▲":"▼"}</span>
+              </div>
+              {recurringOpen&&<div style={{padding:"0 14px 14px"}}>
+                {recurringExp.map(r=>{
+                  const start=new Date(r.startDate);
+                  const startMon=start.getFullYear()*12+start.getMonth();
+                  const nowMon=new Date().getFullYear()*12+new Date().getMonth();
+                  const elapsed=nowMon-startMon;
+                  const totalM=r.totalMonths||999;
+                  const remM=totalM-elapsed;
+                  const skipM=r.skipMonths||[];
+                  const isActive=elapsed>=0&&elapsed<totalM&&!skipM.includes(nowMonth2);
+                  const fundedBy=r.fundedBy||[];
+                  const fundLabel=fundedBy.map(k=>k==="maas"?"Maaş":k==="kira_geliri"?"Kira Gel.":incomes.find(i=>"inc_"+i.id===k)?.label||k).join("+");
+                  return <div key={r.id} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"10px 11px",borderRadius:11,marginBottom:6,marginTop:6,background:isActive?"#f9f0ff":"#fafafa",border:isActive?"1px solid #d7bef5":"1px solid #eee",opacity:isActive?1:0.55}}>
+                    <div style={{fontSize:22,lineHeight:1,paddingTop:2}}>{r.icon}</div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{display:"flex",alignItems:"center",gap:5,flexWrap:"wrap",marginBottom:2}}>
+                        <span style={{fontSize:12,fontWeight:700}}>{r.category}</span>
+                        {isActive
+                          ? <span style={{fontSize:9,background:"#8e44ad",color:"#fff",borderRadius:20,padding:"1px 6px",fontWeight:700}}>✓ Aktif</span>
+                          : <span style={{fontSize:9,background:"#eee",color:"#999",borderRadius:20,padding:"1px 6px",fontWeight:700}}>⏸ Bu ay yok</span>}
+                        {skipM.length>0&&<span style={{fontSize:9,background:"#fdf0f0",color:"#e74c3c",borderRadius:20,padding:"1px 6px"}}>⛔ {skipM.map(i=>MNAMES2[i]).join(",")}</span>}
+                      </div>
+                      <div style={{fontSize:10,color:"#888"}}>
+                        Her ayın {r.dayOfMonth}. · {totalM>=999?"Süresiz":`${elapsed+1}/${totalM} ay · ${remM} kaldı`}
+                      </div>
+                      {fundLabel&&<div style={{fontSize:9,color:"#8e44ad",marginTop:1}}>💡 {fundLabel}</div>}
+                      {r.note&&<div style={{fontSize:9,color:"#b39ddb",fontStyle:"italic",marginTop:1}}>{r.note}</div>}
+                    </div>
+                    <div style={{textAlign:"right",flexShrink:0}}>
+                      <div style={{fontSize:13,fontWeight:800,color:isActive?"#8e44ad":"#aaa"}}>{fmt(r.amount)}</div>
+                      <div style={{display:"flex",gap:4,marginTop:4,justifyContent:"flex-end"}}>
+                        <button onClick={()=>{setRForm({...r,amount:r.amount,skipMonths:r.skipMonths||[],fundedBy:r.fundedBy||[]});setEditRecurringId(r.id);setShowAddRecurring(true);}} style={{background:"#f0f4ff",color:"#2980b9",border:"1px solid #d0e0ff",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>✏️</button>
+                        <button onClick={()=>deleteRecurring(r.id)} style={{background:"#fdf0f0",color:"#c0392b",border:"1px solid #f5c6c0",borderRadius:6,padding:"2px 7px",fontSize:10,cursor:"pointer"}}>🗑</button>
+                      </div>
+                    </div>
+                  </div>;
+                })}
+              </div>}
+            </Card>;
+          })()}
 
           {(() => {
             const filteredExp = [...allExpenses]
