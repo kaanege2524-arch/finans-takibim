@@ -2038,47 +2038,6 @@ Türkçe, samimi, max 350 kelime.`;
                 })}
               </div>
               {(rForm.skipMonths||[]).length>0&&<div style={{fontSize:10,color:"#e74c3c",marginTop:4}}>
-                ⛔ {(rForm.skipMonths).map(i=>["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"][i]).join(", ")} aylarında bu gider sayılmayacak
-              </div>}
-            </div>
-
-            {/* Hangi gelirden karşılanıyor */}
-            <div style={{marginBottom:8}}>
-              <div style={{fontSize:11,color:"#888",marginBottom:5,fontWeight:600}}>💡 Hangi gelirden karşılanıyor? (isteğe bağlı)</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                {[{label:"💰 Maaş",key:"maas"},{label:"🏠 Kira Geliri",key:"kira_geliri"},...incomes.map(i=>({label:i.label,key:"inc_"+i.id}))].filter((v,idx,a)=>a.findIndex(x=>x.key===v.key)===idx).map(src=>{
-                  const sel=(rForm.fundedBy||[]).includes(src.key);
-                  return <button key={src.key} onClick={()=>{
-                    const fb=rForm.fundedBy||[];
-                    setRForm({...rForm,fundedBy:sel?fb.filter(x=>x!==src.key):[...fb,src.key]});
-                  }} style={{padding:"4px 10px",fontSize:11,borderRadius:20,
-                    border:`1.5px solid ${sel?"#8e44ad":"#ddd"}`,
-                    background:sel?"#8e44ad":"#fff",color:sel?"#fff":"#666",
-                    cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
-                    {src.label}
-                  </button>;
-                })}
-              </div>
-            </div>
-
-            {/* Skip aylar */}
-            <div style={{marginBottom:8}}>
-              <div style={{fontSize:11,color:"#888",marginBottom:5,fontWeight:600}}>⛔ Bu aylarda ÖDENMEYECEK (tıkla seç)</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                {["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"].map((mn,i)=>{
-                  const sel=(rForm.skipMonths||[]).includes(i);
-                  return <button key={i} onClick={()=>{
-                    const s=rForm.skipMonths||[];
-                    setRForm({...rForm,skipMonths:sel?s.filter(x=>x!==i):[...s,i]});
-                  }} style={{padding:"4px 9px",fontSize:11,borderRadius:20,
-                    border:`1.5px solid ${sel?"#e74c3c":"#e0e0e0"}`,
-                    background:sel?"#fdf0f0":"#fff",color:sel?"#c0392b":"#666",
-                    cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:sel?700:400}}>
-                    {mn}
-                  </button>;
-                })}
-              </div>
-              {(rForm.skipMonths||[]).length>0&&<div style={{fontSize:10,color:"#e74c3c",marginTop:4}}>
                 ⛔ {(rForm.skipMonths).map(i=>["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"][i]).join(", ")} aylarında sayılmayacak
               </div>}
             </div>
