@@ -227,7 +227,22 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
 
     // Kullanılabilir nakit
     const carryOverThisMonth = carryOver;
-    const available = Math.max(0, income + carryOver - fixedTotal - livingCost);
+    // Sabit giderleri (kira hariç) hesaba kat — skipMonths ve startDate'e göre
+    const recurringCost = (recurringExp||[]).reduce((s,r) => {
+      const cat = (r.category||"").toLowerCase();
+      // Kira zaten livingCost içinde, tekrar sayma
+      if(cat.includes("kira") || cat.includes("ev ")) return s;
+      const startD = new Date(r.startDate||"2026-01-01");
+      const startMon = startD.getFullYear()*12 + startD.getMonth();
+      const thisMon = (2026 + Math.floor((2+mi)/12))*12 + ((2+mi)%12);
+      const elapsed = thisMon - startMon;
+      const totalM = r.totalMonths || 999;
+      if(elapsed < 0 || elapsed >= totalM) return s;
+      const skipM = r.skipMonths || [];
+      if(skipM.includes((2+mi)%12)) return s;
+      return s + (r.amount||0);
+    }, 0);
+    const available = Math.max(0, income + carryOver - fixedTotal - livingCost - recurringCost);
     carryOver = 0;
 
     // Strateji sıralaması
@@ -702,15 +717,14 @@ function App(){
   const longestMonths=Math.max(...debts.map(d=>(d.type==="kredi"?buildFixedPlan(d):buildFlexPlan(d)).length));
 
   // livingForPlan: recurringExp içindeki "kira" kategorili sabit giderlerden hesapla
-  // Yoksa planLiving, o da yoksa varsayılan 27000
-  const livingForPlan = (() => {
+  const livingForPlan = useMemo(()=>{
     const kiraRec = recurringExp.filter(r => {
       const cat = (r.category||"").toLowerCase();
       return cat.includes("kira") || cat.includes("ev ");
     });
     if(kiraRec.length > 0) return kiraRec.reduce((s,r)=>s+r.amount,0);
     return (planLiving >= 1000) ? planLiving : estLiving;
-  })();
+  }, [recurringExp, planLiving, estLiving]);
   const cascadePlans=useMemo(()=>({
     avalanche: buildCascadePlan(debts, salary, incomes, "avalanche", livingForPlan, recurringExp),
     snowball:  buildCascadePlan(debts, salary, incomes, "snowball",  livingForPlan, recurringExp),
@@ -2007,10 +2021,10 @@ Türkçe, samimi, max 350 kelime.`;
               </div>
             </div>
             <div style={{marginTop:8,marginBottom:8}}>
-              <div style={{fontSize:11,color:"#888",marginBottom:4}}>Kaç ay sürecek?</div>
+              <div style={{fontSize:11,color:"#888",marginBottom:4}}>Kaç ay sürecek? <button type="button" onClick={()=>setRForm({...rForm,totalMonths:999})} style={{fontSize:10,padding:"2px 8px",borderRadius:20,border:`1.5px solid ${rForm.totalMonths===999?"#8e44ad":"#e0e0e0"}`,background:rForm.totalMonths===999?"#8e44ad":"#fff",color:rForm.totalMonths===999?"#fff":"#888",cursor:"pointer",fontFamily:"'Sora',sans-serif",fontWeight:rForm.totalMonths===999?700:400}}>♾ Süresiz</button></div>
               <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
                 {[3,6,12,24,36,60].map(n=>(
-                  <button key={n} onClick={()=>setRForm({...rForm,totalMonths:n})} style={{padding:"6px 12px",border:`2px solid ${rForm.totalMonths===n?"#8e44ad":"#e0e0e0"}`,borderRadius:8,background:rForm.totalMonths===n?"#f3e8fd":"#fff",color:rForm.totalMonths===n?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
+                  <button type="button" key={n} onClick={()=>setRForm({...rForm,totalMonths:n})} style={{padding:"6px 12px",border:`2px solid ${rForm.totalMonths===n?"#8e44ad":"#e0e0e0"}`,borderRadius:8,background:rForm.totalMonths===n?"#f3e8fd":"#fff",color:rForm.totalMonths===n?"#8e44ad":"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>
                     {n} ay
                   </button>
                 ))}
@@ -2080,8 +2094,8 @@ Türkçe, samimi, max 350 kelime.`;
             </select>}
 
             <div style={{display:"flex",gap:8}}>
-              <button onClick={saveRecurring} style={btnS("#8e44ad")}>{editRecurringId?"Güncelle":"Kaydet"}</button>
-              <button onClick={()=>{setShowAddRecurring(false);setEditRecurringId(null);setRForm(blankRecurring);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
+              <button type="button" onClick={saveRecurring} style={btnS("#8e44ad")}>{editRecurringId?"Güncelle":"Kaydet"}</button>
+              <button type="button" onClick={()=>{setShowAddRecurring(false);setEditRecurringId(null);setRForm(blankRecurring);}} style={{...btnP,background:"#eee",color:"#555"}}>İptal</button>
             </div>
           </Card>}
 
