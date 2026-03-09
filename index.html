@@ -145,30 +145,26 @@ const fmt=n=>new Intl.NumberFormat("tr-TR",{style:"currency",currency:"TRY",maxi
 // Her ay tüm borçları birlikte hesaplar, kapanan borcun nakitini aktarır
 function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurringExp){
   strategy = strategy || "avalanche";
-  livingCost = livingCost || 15000;
+  livingCost = livingCost || 27000;
 
   const MNAMES = ["Oca","Şub","Mar","Nis","May","Haz","Tem","Ağu","Eyl","Eki","Kas","Ara"];
-  // Başlangıç: Mart 2026 = ay index 2
-  const START_YEAR = 2026, START_MONTH = 2;
+  const START_YEAR = 2026, START_MONTH = 2; // Mart 2026
 
+  // Bu ay için geliri hesapla
   function monthIncome(mi){
     const absMonth = START_MONTH + mi;
-    const m = absMonth % 12; // 0-indexed ay
+    const m = absMonth % 12;
     const y = START_YEAR + Math.floor(absMonth / 12);
     const msStr = y + "-" + String(m+1).padStart(2,"0");
     let total = salary;
     (incomes||[]).forEach(inc => {
       if(!inc.amount) return;
-      // Tekrarlayan değilse sadece kendi ayında say
       if(!inc.recurring){
         if((inc.date||"").slice(0,7) === msStr) total += (inc.amount||0);
         return;
       }
-      // Başlangıç ayı kontrolü
       if(inc.startMonth && msStr < inc.startMonth) return;
-      // Bitiş ayı kontrolü
       if(inc.endMonth && msStr > inc.endMonth) return;
-      // Skip ayları (0=Ocak)
       const skip = inc.skipMonths || [];
       if(skip.includes(m)) return;
       total += (inc.amount||0);
@@ -176,28 +172,45 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
     return total;
   }
 
+  // Bu ay için yaşam giderini hesapla (kira + diğer sabit, skip dahil)
+  function monthLiving(mi){
+    if(!recurringExp || recurringExp.length === 0) return livingCost;
+    const m = (START_MONTH + mi) % 12;
+    const y = START_YEAR + Math.floor((START_MONTH + mi) / 12);
+    const thisMon = y * 12 + m;
+    let total = 0;
+    recurringExp.forEach(r => {
+      const startD = new Date(r.startDate || "2026-01-01");
+      const startMon = startD.getFullYear()*12 + startD.getMonth();
+      const elapsed = thisMon - startMon;
+      const totalM = r.totalMonths || 999;
+      if(elapsed < 0 || elapsed >= totalM) return;
+      const skipM = r.skipMonths || [];
+      if(skipM.includes(m)) return;
+      total += (r.amount || 0);
+    });
+    return total;
+  }
+
   function monthLabel(mi){
-    const absMonth = START_MONTH + mi;
-    const m = absMonth % 12;
-    const y = START_YEAR + Math.floor(absMonth / 12);
+    const m = (START_MONTH + mi) % 12;
+    const y = START_YEAR + Math.floor((START_MONTH + mi) / 12);
     return MNAMES[m] + " " + y;
   }
 
   function monthStr(mi){
-    const absMonth = START_MONTH + mi;
-    const m = absMonth % 12;
-    const y = START_YEAR + Math.floor(absMonth / 12);
+    const m = (START_MONTH + mi) % 12;
+    const y = START_YEAR + Math.floor((START_MONTH + mi) / 12);
     return y + "-" + String(m+1).padStart(2,"0");
   }
 
-  // Borç durumunu kopyala
+  // Borç state — userPayment dahil
   const state = (debts||[]).map(d => ({
-    id: d.id,
-    name: d.name,
-    type: d.type,
+    id: d.id, name: d.name, type: d.type,
     rem: Number(d.remaining) || 0,
     rate: Number(d.rate) || 0,
     monthly: Number(d.monthly) || 0,
+    userPayment: Number(d.userPayment) || 0,
     done: false,
   }));
 
@@ -211,83 +224,74 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
     const ms = monthStr(mi);
     const label = monthLabel(mi);
     const income = monthIncome(mi);
+    const effLiving = monthLiving(mi);
 
-    // Bu ay kart borçlarına geçmiş taksit ekle (sabit)
+    // Geçmiş taksit eklemeleri
     const additions = (DEBT_ADDITIONS||[]).filter(a => a.month === ms);
     additions.forEach(a => {
       const debt = state.find(s => !s.done && s.name.toLowerCase().includes(a.debtName.toLowerCase()) && s.type === "kredi_karti");
       if(debt) debt.rem += a.amount;
     });
-    // DEBT_ADDITIONS yukarıda işlendi; taksit harcamaları remaining'e anında eklenir
 
+    // Sabit kredi ödemeleri (taksit tutarı değişmez)
     const fixed = active.filter(d => d.type === "kredi");
     const flex  = active.filter(d => d.type !== "kredi");
-
     const fixedTotal = fixed.reduce((s,d) => s + Math.min(d.monthly, d.rem), 0);
 
-    // Kullanılabilir nakit
+    // Bu ay kullanılabilir nakit (carryOver önceki aydan kalan)
     const carryOverThisMonth = carryOver;
-    // Sabit giderleri (kira hariç) hesaba kat — skipMonths ve startDate'e göre
-    const recurringCost = (recurringExp||[]).reduce((s,r) => {
-      const cat = (r.category||"").toLowerCase();
-      // Kira zaten livingCost içinde, tekrar sayma
-      if(cat.includes("kira") || cat.includes("ev ")) return s;
-      const startD = new Date(r.startDate||"2026-01-01");
-      const startMon = startD.getFullYear()*12 + startD.getMonth();
-      const thisMon = (2026 + Math.floor((2+mi)/12))*12 + ((2+mi)%12);
-      const elapsed = thisMon - startMon;
-      const totalM = r.totalMonths || 999;
-      if(elapsed < 0 || elapsed >= totalM) return s;
-      const skipM = r.skipMonths || [];
-      if(skipM.includes((2+mi)%12)) return s;
-      return s + (r.amount||0);
-    }, 0);
-    const available = Math.max(0, income + carryOver - fixedTotal - livingCost - recurringCost);
+    const available = Math.max(0, income + carryOver - fixedTotal - effLiving);
     carryOver = 0;
 
     // Strateji sıralaması
     let sorted;
-    if(strategy === "avalanche") sorted = [...flex].sort((a,b) => b.rate - a.rate || a.rem - b.rem); // faiz eşitse küçük önce
-    else if(strategy === "snowball") sorted = [...flex].sort((a,b) => a.rem - b.rem);
-    else sorted = [...flex];
+    if(strategy === "avalanche")      sorted = [...flex].sort((a,b) => b.rate - a.rate || a.rem - b.rem);
+    else if(strategy === "snowball")  sorted = [...flex].sort((a,b) => a.rem - b.rem);
+    else                              sorted = [...flex];
 
-    // Ödeme dağıtımı
+    // Ödeme hesapla
     const pays = {};
     fixed.forEach(d => { pays[d.id] = Math.min(d.monthly, d.rem); });
 
     if(strategy === "minimum"){
-      sorted.forEach(d => {
-        pays[d.id] = Math.min(Math.ceil(d.rem * 0.20), d.rem);
-      });
-    } else if(strategy === "manuel"){
-      // Manuel: her borcun userPayment'ını kullan (en az min)
+      // Minimum: sadece faiz + %20 anapara
       sorted.forEach(d => {
         const interest = Math.round(d.rem * d.rate / 100);
-        const minPay = Math.min(Math.ceil(d.rem * 0.20) + interest, d.rem + interest);
-        const manual = d.userPayment ? d.userPayment + interest : minPay;
-        pays[d.id] = Math.min(Math.max(manual, minPay), d.rem + interest);
+        const minPrincipal = Math.ceil(d.rem * 0.20);
+        pays[d.id] = Math.min(interest + minPrincipal, d.rem + interest);
+      });
+    } else if(strategy === "manuel"){
+      // Manuel: kullanıcının belirlediği tutar (faiz dahil, en az minimum)
+      sorted.forEach(d => {
+        const interest = Math.round(d.rem * d.rate / 100);
+        const minPay = interest + Math.ceil(d.rem * 0.20);
+        const target = d.userPayment > 0 ? d.userPayment : minPay;
+        pays[d.id] = Math.min(Math.max(target, minPay), d.rem + interest);
       });
     } else {
-      // 1) Herkese minimum öde
+      // Avalanche / Snowball:
+      // 1) Her borca kullanıcı hedef ödemesi veya minimum öde
       let rem = available;
       sorted.forEach(d => {
         const interest = Math.round(d.rem * d.rate / 100);
-        const min = Math.min(Math.ceil(d.rem * 0.20) + interest, d.rem + interest);
-        pays[d.id] = Math.min(min, rem);
+        const minPay = interest + Math.ceil(d.rem * 0.20);
+        const target = d.userPayment > 0 ? Math.max(d.userPayment, minPay) : minPay;
+        pays[d.id] = Math.min(target, rem, d.rem + interest);
         rem -= pays[d.id];
       });
       rem = Math.max(0, rem);
-      // 2) Kalan nakiti stratejiye göre öncelikli borca ver
+      // 2) Kalan nakiti öncelikli borca ekle (tam kapama)
       for(let i = 0; i < sorted.length && rem > 0; i++){
         const d = sorted[i];
         const interest = Math.round(d.rem * d.rate / 100);
-        const fullPayoff = d.rem + interest;
-        const add = Math.min(rem, fullPayoff - pays[d.id]);
+        const cap = d.rem + interest;
+        const add = Math.min(rem, cap - pays[d.id]);
         if(add > 0){ pays[d.id] += add; rem -= add; }
       }
+      carryOver = rem; // Hâlâ artarsa gelecek aya devret
     }
 
-    // Ödemeleri uygula
+    // Ödemeleri uygula ve log oluştur
     const payments = [];
     let monthTotal = 0;
     state.forEach(debt => {
@@ -301,22 +305,27 @@ function buildCascadePlan(debts, salary, incomes, strategy, livingCost, recurrin
       principal = Math.min(principal, debt.rem);
       debt.rem = Math.max(0, debt.rem - principal);
       if(debt.rem < 1){ debt.rem = 0; debt.done = true; }
-      const p = Math.round(interest + principal);
       payments.push({
         id: debt.id, name: debt.name, type: debt.type,
-        payment: p, interest: Math.round(interest),
+        payment: Math.round(interest + principal),
+        interest: Math.round(interest),
         principal: Math.round(principal),
         remaining: Math.round(debt.rem),
         finished: debt.done,
       });
-      monthTotal += p;
+      monthTotal += Math.round(interest + principal);
     });
 
-    // Surplus hesapla ve devret
-    const surplus = Math.max(0, available - (monthTotal - fixedTotal));
-    carryOver = surplus;
+    const surplus = Math.max(0, available - monthTotal + fixedTotal);
 
-    log.push({ label, monthIdx: mi, income, carryOver: carryOverThisMonth, livingCost, additions, payments, total: monthTotal, surplus });
+    log.push({
+      label, monthIdx: mi, income,
+      carryOver: carryOverThisMonth,
+      livingCost: effLiving,
+      additions, payments,
+      total: monthTotal,
+      surplus
+    });
   }
 
   return log;
