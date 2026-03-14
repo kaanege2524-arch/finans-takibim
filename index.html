@@ -1244,19 +1244,32 @@ body{
   <!-- BORÇ PLANI -->
   <div id="aiTab-plan" style="display:none">
     <div class="content">
-      <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px;margin-bottom:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:12px">Aylık ek ödeme bütçesi</div>
-        <div style="display:flex;align-items:center;gap:10px">
-          <input type="number" id="planBudget" class="fi" placeholder="₺ aylık ekstra ödeme" style="flex:1"/>
-          <button onclick="aiPlanOlustur()" style="background:var(--violet);color:#fff;border:none;border-radius:9px;padding:10px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap">Plan Oluştur</button>
+      <!-- Ayar paneli -->
+      <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px;margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Plan Ayarları</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Aylık ekstra ödeme</div>
+            <input type="number" id="planBudget" class="fi" placeholder="0" oninput="planOnizle()" style="font-size:13px"/>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Hesaplama</div>
+            <div id="planOnizleSonuc" style="font-size:12px;color:var(--violet);font-weight:600;padding:10px 0">—</div>
+          </div>
         </div>
-        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap" id="planStratejiRow">
-          <button class="ai-oneri aktif-plan" id="planStr-avalanche" onclick="planStrSec('avalanche')">🏔️ Çığ (yüksek faiz önce)</button>
-          <button class="ai-oneri" id="planStr-snowball" onclick="planStrSec('snowball')">⛄ Kartopu (küçük borç önce)</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="planStratejiRow">
+          <button class="ai-oneri aktif-plan" id="planStr-avalanche" onclick="planStrSec('avalanche')">🏔️ Çığ</button>
+          <button class="ai-oneri" id="planStr-snowball" onclick="planStrSec('snowball')">⛄ Kartopu</button>
           <button class="ai-oneri" id="planStr-hybrid" onclick="planStrSec('hybrid')">⚡ Karma</button>
         </div>
+        <button onclick="planHesapla()" style="width:100%;background:var(--violet);color:#fff;border:none;border-radius:var(--radius-sm);padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">
+          📅 Ay ay plan oluştur
+        </button>
       </div>
+      <!-- Plan tablosu -->
       <div id="planSonuc"></div>
+      <!-- AI yorum -->
+      <div id="planAIYorum"></div>
     </div>
   </div>
 
@@ -2500,32 +2513,156 @@ function projAySec(ay, btn){
 }
 
 // ── BORÇ PLANI ────────────────────────────────────────────────────────
-function aiPlanOlustur(){
+function planOnizle(){
+  const ekstra = Number(document.getElementById('planBudget').value)||0;
+  const buAy = new Date().getMonth();
+  const topGelir = gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
+  const topMin = borclar.reduce((s,d)=>s+minOd(d),0);
+  const serbest = topGelir - topMin + ekstra;
+  const el = document.getElementById('planOnizleSonuc');
+  if(serbest<=0){ el.style.color='var(--ruby)'; el.textContent='Yetersiz bütçe'; return; }
+  el.style.color='var(--violet)';
+  el.textContent = fmt(serbest)+'/ay serbest';
+}
+
+function planHesapla(){
   const ekstra = Number(document.getElementById('planBudget').value)||0;
   const el = document.getElementById('planSonuc');
-  el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)"><div class="ai-yukleniyor"><span></span><span></span><span></span></div></div>';
+  const elAI = document.getElementById('planAIYorum');
+  el.innerHTML = '';
+  elAI.innerHTML = '';
 
-  const buAy=new Date().getMonth();
-  const topGelir=gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
-  const topMin=borclar.reduce((s,d)=>s+minOd(d),0);
-  const serbest=topGelir-topMin+ekstra;
+  const AYLAR2=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const buAy=new Date().getMonth(), buYil=new Date().getFullYear();
 
-  const strMap={avalanche:'Çığ (yüksek faizli borçları önce kapat)',snowball:'Kartopu (küçük bakiyeli borçları önce kapat)',hybrid:'Karma (yüksek faiz + küçük bakiye dengesi)'};
+  // Borçları kopyala — simülasyon için
+  let simBorclar = borclar.filter(d=>d.tip==='kmh'||d.tip==='kredi_karti'||d.tip==='kredi').map(d=>({
+    id:d.id, ad:d.ad.replace(/KMH - |K\.Kartı - |Kredi - /,''),
+    tip:d.tip, borc:d.borc, faiz:d.faiz||0,
+    odemeGun:d.odemeGun||d.sonOdemeGun||1,
+    taksitTutar:d.taksitTutar||0, taksit:d.taksit||0,
+    aktif:d.borc>0
+  }));
+
+  // Strateji sıralaması
+  if(planStratejisi==='avalanche'){
+    simBorclar.sort((a,b)=>b.faiz-a.faiz);
+  } else if(planStratejisi==='snowball'){
+    simBorclar.sort((a,b)=>a.borc-b.borc);
+  } else {
+    simBorclar.sort((a,b)=>(b.faiz*b.borc)-(a.faiz*a.borc));
+  }
+
+  const MAKS_AY = 120;
+  const planSatirlar = [];
+  let toplamFaiz = 0;
+
+  for(let i=0;i<MAKS_AY;i++){
+    const ay=(buAy+i)%12, yil=buYil+Math.floor((buAy+i)/12);
+    const ayGelir = gelirler.filter(g=>!g.skipAylar.includes(ay)).reduce((s,g)=>s+g.tutar,0);
+
+    // Faiz ekle (KMH ve KK için)
+    simBorclar.forEach(d=>{
+      if(!d.aktif) return;
+      if(d.tip==='kredi') return; // Sabit kredi faiz yok
+      const faiz = Math.round(d.borc*(d.faiz/100));
+      d.borc += faiz;
+      toplamFaiz += faiz;
+    });
+
+    // Min ödemeleri hesapla
+    let topMinBu = simBorclar.filter(d=>d.aktif).reduce((s,d)=>{
+      if(d.tip==='kredi') return s+(d.taksitTutar||0);
+      return s+Math.round(d.borc*(d.faiz/100))+Math.ceil(d.borc*0.20);
+    },0);
+
+    // Serbest para
+    let serbest = ayGelir - topMinBu + ekstra;
+    if(serbest<0) serbest=0;
+
+    // Min ödemeleri uygula
+    simBorclar.forEach(d=>{
+      if(!d.aktif) return;
+      let od = d.tip==='kredi'?(d.taksitTutar||0):(Math.round(d.borc*(d.faiz/100))+Math.ceil(d.borc*0.20));
+      d.borc = Math.max(0, d.borc-od);
+      if(d.borc<=0){ d.aktif=false; }
+    });
+
+    // Ekstra parayı öncelikli borca ekle
+    let kalanEkstra = serbest;
+    for(let b of simBorclar){
+      if(!b.aktif || kalanEkstra<=0) continue;
+      const odeme = Math.min(kalanEkstra, b.borc);
+      b.borc = Math.max(0, b.borc-odeme);
+      kalanEkstra -= odeme;
+      if(b.borc<=0) b.aktif=false;
+    }
+
+    const toplamKalan = simBorclar.reduce((s,d)=>s+d.borc,0);
+    planSatirlar.push({ay,yil,ayGelir,topMinBu,serbest,toplamKalan});
+
+    if(toplamKalan<=0) break;
+  }
+
+  const borcBitti = planSatirlar.length;
+  const topKalan = simBorclar.reduce((s,d)=>s+d.borc,0);
+
+  // Tablo HTML
+  let html = `<div style="background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px">
+    <div style="background:var(--violet);color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;font-weight:600">📅 Ay Ay Ödeme Planı</span>
+      <span style="font-size:11px;opacity:.8">${topKalan<=0?borcBitti+' ayda borçsuz':''+borcBitti+' ay hesaplandı'}</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border)">
+        <th style="padding:7px 10px;text-align:left;color:var(--text3);font-weight:600">Ay</th>
+        <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:600">Gelir</th>
+        <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:600">Ödeme</th>
+        <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:600">Kalan Borç</th>
+      </tr></thead><tbody>`;
+
+  planSatirlar.forEach((s,i)=>{
+    const pct = Math.max(0,100-Math.round(s.toplamKalan/borclar.reduce((ss,d)=>ss+d.borc,0)*100));
+    const renk = s.toplamKalan<=0?'var(--emerald)':pct>60?'var(--sapphire)':'var(--text1)';
+    html+=`<tr style="border-bottom:1px solid var(--bg)${i%2===0?';background:var(--surface2)':''}">
+      <td style="padding:5px 10px;color:var(--text2);font-weight:500">${AYLAR2[s.ay]} ${s.yil}</td>
+      <td style="padding:5px 10px;text-align:right;color:var(--emerald)">${fmtK(s.ayGelir)}</td>
+      <td style="padding:5px 10px;text-align:right;color:var(--ruby)">${fmtK(s.topMinBu)}</td>
+      <td style="padding:5px 10px;text-align:right;font-weight:600;color:${renk}">${s.toplamKalan<=0?'✅ Bitti':fmtK(s.toplamKalan)}</td>
+    </tr>`;
+  });
+
+  html+=`</tbody></table>
+    <div style="padding:10px 14px;background:var(--violet-lt);border-top:1px solid var(--border);display:flex;justify-content:space-between">
+      <span style="font-size:11px;color:var(--violet);font-weight:600">Tahmini toplam faiz</span>
+      <span style="font-size:11px;color:var(--ruby);font-weight:600">${fmt(toplamFaiz)}</span>
+    </div>
+  </div>`;
+
+  el.innerHTML = html;
+
+  // AI yorumu iste
+  elAI.innerHTML = `<button onclick="planAIYorumAl(${borcBitti},${Math.round(toplamFaiz)})" style="width:100%;background:var(--ink);color:#fff;border:none;border-radius:var(--radius);padding:11px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:14px">
+    🤖 AI ile Plan Yorumu ve Öneriler Al
+  </button>`;
+}
+
+function planAIYorumAl(aylar, toplamFaiz){
+  const el = document.getElementById('planAIYorum');
+  el.innerHTML = '<div style="text-align:center;padding:12px"><div class="ai-yukleniyor"><span></span><span></span><span></span></div></div>';
+  const ekstra = Number(document.getElementById('planBudget').value)||0;
   const veri = aiVeriOzeti();
-  const prompt=`${veri}
-
-Kullanıcı aylık ${fmt(ekstra)} ek ödeme yapabilecek.
-Toplam serbest nakit: ${fmt(serbest)}/ay
-
-${strMap[planStratejisi]} stratejisiyle borç ödeme planı oluştur.
-
-Şu formatı kullan:
-1. Öncelik sırasına göre her borç için: Borç adı → Aylık ödeme → Kapanma tarihi
-2. Toplam kaç ayda borçsuz olunur
-3. Toplam faiz tasarrufu
-
-Kısa ve net tablo formatında, Türkçe yaz.`;
-
+  const strMap = {avalanche:'Cig',snowball:'Kartopu',hybrid:'Karma'};
+  const str = strMap[planStratejisi]||'Karma';
+  const ekstraStr = ekstra>0 ? fmt(ekstra)+' ekstra odeme yaparak ' : '';
+  const prompt = veri + '\n\n' +
+    'Bu kullanici ' + str + ' stratejisi ile ' + ekstraStr +
+    aylar + ' ayda borcunu bitirebilir. Toplam faiz: ' + fmt(toplamFaiz) + '.\n\n' +
+    'Buna gore: 1) Bu plani gerceklestirmek icin 2-3 kritik oneri ' +
+    '2) Hangi ay en zor olacak ve neden ' +
+    '3) Plani hizlandirmak icin 1 pratik ipucu ' +
+    '4) Kisa bir motivasyon mesaji. ' +
+    'Kisa somut Turkce yaz.';
   aiAPIcagir(prompt, el);
 }
 
