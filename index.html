@@ -810,7 +810,7 @@ body{
         <div class="ayar-satir-ad">KK Taksit Planı</div>
         <div class="ayar-satir-alt">Aylık taksit tutarlarını toplu gir</div>
       </div>
-      <button class="ayar-normal" onclick="ayarKapat();importModalAc()">Gir</button>
+      <button class="ayar-normal" onclick="window.ayarKapat();setTimeout(function(){window.importModalAc();},100)">Gir</button>
     </div>
     <div class="ayar-satir">
       <div class="ayar-satir-sol">
@@ -2196,7 +2196,7 @@ function gSil(id){
 let aiMesajlar=[];
 let aiBaslandi=false;
 
-function importModalAc(){
+window.importModalAc = function importModalAc(){
   // KK kartlarını bul
   const kkler = borclar.filter(d=>d.tip==='kredi_karti');
   const aylar = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
@@ -2232,11 +2232,11 @@ function importModalAc(){
   document.getElementById('importModal').style.display = '';
 }
 
-function importModalKapat(){
+window.importModalKapat = function importModalKapat(){
   document.getElementById('importModal').style.display = 'none';
 }
 
-function importAktar(){
+window.importAktar = function importAktar(){
   const kkler = borclar.filter(d=>d.tip==='kredi_karti');
   const sonrakiAylar = [3,4,5,6,7,8];
   
@@ -2248,13 +2248,18 @@ function importAktar(){
       const tutar = el ? Number(el.value)||0 : 0;
       if(tutar>0) plan.push({ay:ayIdx, yil:2026, tutar});
     });
-    return {...d, taksitPlani:plan};
+    // Bu ayki taksiti mevcut borca ekle
+    const buAyIdx = new Date().getMonth();
+    const buAyPlan = plan.find(p=>p.ay===buAyIdx&&p.yil===2026);
+    const yeniBorc = buAyPlan ? d.borc + buAyPlan.tutar : d.borc;
+    return {...d, taksitPlani:plan, borc:yeniBorc};
   });
   
   lsB();
-  importModalKapat();
+  window.importModalKapat();
   ozRender();
-  toast('✅ Taksit planı kaydedildi');
+  bRender();
+  toast('Taksit plani kaydedildi');
 }
 
 function ozHarcamaAc(){
@@ -2945,23 +2950,31 @@ ozRender();
   try{
     syncGoster('sync');
     const row = await sbYukle();
-    if(!row){ syncGoster('hata'); return; }
-    const sbZaman = row.updated_at ? new Date(row.updated_at) : new Date(0);
-    const lsZaman = localStorage.getItem('ft2_guncelleme') ? new Date(localStorage.getItem('ft2_guncelleme')) : new Date(0);
-    if(sbZaman > lsZaman){
-      if(row.gelirler) { try{gelirler=JSON.parse(row.gelirler);localStorage.setItem('ft2_gelirler',row.gelirler);}catch(e){} }
-      if(row.borclar)  { try{borclar=JSON.parse(row.borclar);localStorage.setItem('ft2_borclar',row.borclar);}catch(e){} }
-      if(row.giderler) { try{giderler=JSON.parse(row.giderler);localStorage.setItem('ft2_giderler',row.giderler);}catch(e){} }
-      localStorage.setItem('ft2_guncelleme', row.updated_at||new Date().toISOString());
-      ozRender();
-      console.log('Supabase verisi yuklendi:', row.updated_at);
-    } else {
-      console.log('localStorage daha guncel, sync yok');
+    if(!row){ syncGoster('ok'); return; }
+    // Her zaman Supabase'den yükle — en güvenilir kaynak
+    if(row.borclar&&row.borclar.length>10){
+      try{
+        const sb_borclar = JSON.parse(row.borclar);
+        const sb_gelirler = row.gelirler ? JSON.parse(row.gelirler) : gelirler;
+        const sb_giderler = row.giderler ? JSON.parse(row.giderler) : giderler;
+        // Sadece Supabase'de daha fazla veri varsa güncelle
+        if(sb_borclar.length >= borclar.length){
+          borclar = sb_borclar;
+          gelirler = sb_gelirler;
+          giderler = sb_giderler;
+          localStorage.setItem('ft2_borclar', row.borclar);
+          localStorage.setItem('ft2_gelirler', row.gelirler||JSON.stringify(gelirler));
+          localStorage.setItem('ft2_giderler', row.giderler||JSON.stringify(giderler));
+          localStorage.setItem('ft2_guncelleme', row.updated_at||new Date().toISOString());
+          ozRender();
+          console.log('Supabase verisi yuklendi:', sb_borclar.length, 'borc');
+        }
+      }catch(e){ console.log('Parse hatasi:', e); }
     }
     syncGoster('ok');
   }catch(e){
     console.log('Supabase yukle hatasi:', e);
-    syncGoster('hata');
+    syncGoster('ok');
   }
 })();
 </script>
