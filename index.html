@@ -1157,42 +1157,95 @@ body{
 
 <script>
 // ════════════════════════════════════════════════════════════════════
+// SUPABASE SYNC
+// ════════════════════════════════════════════════════════════════════
+const SB_URL  = 'https://blmhxmquwkiwareuhyoj.supabase.co';
+const SB_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsbWh4bXF1d2tpd2FyZXVoeW9qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4MDgxMDIsImV4cCI6MjA4ODM4NDEwMn0.eTCPOgAvtMVq_xzcTg3C4vY7-j12t7S-dATYxElux90';
+const SB_USER = 'kaan_finans';
+
+async function sbYukle(){
+  try{
+    const r = await fetch(SB_URL+'/rest/v1/finans_data?user_id=eq.'+SB_USER+'&select=*',{
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+    });
+    if(!r.ok) return null;
+    const rows = await r.json();
+    if(!rows||rows.length===0) return null;
+    return rows[0];
+  }catch(e){ console.log('Supabase yükle hatası:',e); return null; }
+}
+
+async function sbKaydet(payload){
+  try{
+    // Upsert — varsa güncelle yoksa ekle
+    const r = await fetch(SB_URL+'/rest/v1/finans_data',{
+      method:'POST',
+      headers:{
+        'apikey':SB_KEY,
+        'Authorization':'Bearer '+SB_KEY,
+        'Content-Type':'application/json',
+        'Prefer':'resolution=merge-duplicates'
+      },
+      body:JSON.stringify({
+        user_id: SB_USER,
+        gelirler: JSON.stringify(gelirler),
+        borclar:  JSON.stringify(borclar),
+        giderler: JSON.stringify(giderler),
+        guncelleme: new Date().toISOString()
+      })
+    });
+    return r.ok;
+  }catch(e){ console.log('Supabase kaydet hatası:',e); return false; }
+}
+
+// Sync toast göstergesi
+function syncGoster(durum){
+  const id='syncToast';
+  let el=document.getElementById(id);
+  if(!el){
+    el=document.createElement('div');
+    el.id=id;
+    el.style.cssText='position:fixed;top:12px;right:12px;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;z-index:9999;transition:opacity .3s';
+    document.body.appendChild(el);
+  }
+  if(durum==='sync')  { el.style.background='#dbeafe';el.style.color='#1d4ed8';el.textContent='↑ Sync...';el.style.opacity='1'; }
+  if(durum==='ok')    { el.style.background='#dcfce7';el.style.color='#15803d';el.textContent='✓ Synced';setTimeout(()=>el.style.opacity='0',1500); }
+  if(durum==='hata')  { el.style.background='#fee2e2';el.style.color='#dc2626';el.textContent='⚠ Sync hata';setTimeout(()=>el.style.opacity='0',3000); }
+}
+
+// Tüm ls* fonksiyonlarından sonra çağrılacak
+async function syncAll(){
+  syncGoster('sync');
+  const ok = await sbKaydet();
+  syncGoster(ok?'ok':'hata');
+}
+
+// ════════════════════════════════════════════════════════════════════
 // ORTAK
 // ════════════════════════════════════════════════════════════════════
 const AYLAR     = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
 const AYLAR_FULL= ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 
+// Veri yükleme — localStorage varsa kullan, yoksa boş başla
+function _yukle(key){ try{ const v=localStorage.getItem(key); return v?JSON.parse(v):null; }catch(e){ return null; } }
 const _sifir = localStorage.getItem('ft2_sifir')==='1';
-let gelirler = (!_sifir&&JSON.parse(localStorage.getItem('ft2_gelirler')||'null'))||(!_sifir?[
-  {id:1,ad:'Maaş',       tutar:81000,gunMin:15,gunMax:15,skipAylar:[]},
-  {id:2,ad:'Kira Geliri',tutar:15000,gunMin:5, gunMax:8, skipAylar:[]},
-  {id:3,ad:'Ek Ders',    tutar:18000,gunMin:3, gunMax:7, skipAylar:[7,8]},
-]:[]);
-let borclar = (!_sifir&&JSON.parse(localStorage.getItem('ft2_borclar')||'null'))||(!_sifir?[
-  {id:1,tip:'kmh',        ad:'KMH - İş Bankası',     borc:87200,faiz:4.25,odemeGun:16,hedef:5000},
-  {id:2,tip:'kmh',        ad:'KMH - Akbank',          borc:69900,faiz:4.25,odemeGun:16,hedef:4000},
-  {id:3,tip:'kmh',        ad:'KMH - Yapı Kredi',      borc:50300,faiz:4.25,odemeGun:15,hedef:3000},
-  {id:4,tip:'kmh',        ad:'KMH - Garanti BBVA',    borc:10200,faiz:4.25,odemeGun:30,hedef:1500},
-  {id:5,tip:'kredi_karti',ad:'K.Kartı - İş Bankası',  borc:22950,faiz:4.25,odemeGun:16,kesimGun:6, sonOdemeGun:16,hedef:0},
-  {id:6,tip:'kredi_karti',ad:'K.Kartı - Akbank',      borc:16800,faiz:4.25,odemeGun:18,kesimGun:8, sonOdemeGun:18,hedef:0},
-  {id:7,tip:'kredi_karti',ad:'K.Kartı - Vakıf Bank',  borc:2506, faiz:4.25,odemeGun:23,kesimGun:13,sonOdemeGun:23,hedef:0},
-  {id:8,tip:'kredi_karti',ad:'K.Kartı - Garanti BBVA',borc:5160, faiz:4.25,odemeGun:23,kesimGun:13,sonOdemeGun:23,hedef:0},
-  {id:9,tip:'kredi',      ad:'Kredi - Garanti BBVA',  borc:23000,faiz:0,   odemeGun:16,taksit:5,taksitTutar:4600},
-]:[]);
-let giderler = _sifir?[]:JSON.parse(localStorage.getItem('ft2_giderler')||'[]');
+let gelirler = (!_sifir && _yukle('ft2_gelirler')) || [];
+let borclar  = (!_sifir && _yukle('ft2_borclar'))  || [];
+let giderler = (!_sifir && _yukle('ft2_giderler')) || [];
 
 function veriSifirla(){
-  // İki adımlı onay
-  if(!confirm('⚠️ TÜM veriler silinecek!\n\nGelirler, borçlar, giderler ve ödemeler dahil her şey sıfırlanacak.\n\nDevam etmek istiyor musunuz?')) return;
-  if(!confirm('Son onay: Veriler geri alınamaz. Emin misiniz?')) return;
-  ['ft2_gelirler','ft2_borclar','ft2_giderler','ft2_odenenler'].forEach(k=>localStorage.removeItem(k));
+  var onay1 = confirm('TUM veriler silinecek! Gelirler, borclar, giderler ve odemeler. Devam?');
+  if(!onay1) return;
+  var onay2 = confirm('Son onay: Veriler geri alinamaz. Emin misiniz?');
+  if(!onay2) return;
+  ['ft2_gelirler','ft2_borclar','ft2_giderler','ft2_odenenler'].forEach(function(k){localStorage.removeItem(k);});
   localStorage.setItem('ft2_sifir','1');
   location.reload();
 }
 
-function lsG(){ localStorage.setItem('ft2_gelirler', JSON.stringify(gelirler)); localStorage.removeItem('ft2_sifir'); }
-function lsB(){ localStorage.setItem('ft2_borclar', JSON.stringify(borclar)); localStorage.removeItem('ft2_sifir'); }
-function lsGid(){ localStorage.setItem('ft2_giderler', JSON.stringify(giderler)); localStorage.removeItem('ft2_sifir'); }
+function lsG(){ localStorage.setItem('ft2_gelirler', JSON.stringify(gelirler)); localStorage.removeItem('ft2_sifir'); localStorage.setItem('ft2_guncelleme', new Date().toISOString()); syncAll(); }
+function lsB(){ localStorage.setItem('ft2_borclar', JSON.stringify(borclar)); localStorage.removeItem('ft2_sifir'); localStorage.setItem('ft2_guncelleme', new Date().toISOString()); syncAll(); }
+function lsGid(){ localStorage.setItem('ft2_giderler', JSON.stringify(giderler)); localStorage.removeItem('ft2_sifir'); localStorage.setItem('ft2_guncelleme', new Date().toISOString()); syncAll(); }
 function fmt(n){ return '₺'+Math.round(n).toLocaleString('tr-TR'); }
 function fmtK(n){ return n>=1000?'₺'+(n/1000).toFixed(1).replace('.0','')+'B':fmt(n); }
 function bugun(){ return new Date().toISOString().split('T')[0]; }
@@ -2311,33 +2364,28 @@ Türkçe, pratik, gerçekçi ve motive edici yaz.`;
 
 // ── ORTAK API ÇAĞRISI ──────────────────────────────────────────────
 function aiVeriOzeti(){
-  const buAy=new Date().getMonth();
-  const topGelir=gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
-  const topBorc=borclar.reduce((s,d)=>s+d.borc,0);
-  const topMin=borclar.reduce((s,d)=>s+minOd(d),0);
-  const buAyHar=giderler.filter(g=>buAyMi(g.tarih)).reduce((s,g)=>s+g.tutar,0);
-  const buAy2=new Date().getMonth(), buYil2=new Date().getFullYear();
-  const buAyOdeme=borclar.reduce((s,d)=>s+((d.odemeler||{})[`${d.id}_${buAy2}_${buYil2}`]||0),0);
-  return `=== FİNANSAL VERİLER ===
-Aylık gelir: ${fmt(topGelir)}
-${gelirler.map(g=>`  - ${g.ad}: ${fmt(g.tutar)}${g.skipAylar.length?' ('+g.skipAylar.length+' ay yok)':''}`).join('
-')}
-
-Toplam borç: ${fmt(topBorc)} (Borç/Gelir: %${Math.round(topBorc/topGelir*100)})
-KMH borçları:
-${borclar.filter(d=>d.tip==='kmh').map(d=>`  - ${d.ad.replace('KMH - ','')}: ${fmt(d.borc)} | Faiz: %${d.faiz} | Min: ${fmt(minOd(d))}`).join('
-')}
-Kredi Kartları:
-${borclar.filter(d=>d.tip==='kredi_karti').map(d=>`  - ${d.ad.replace('K.Kartı - ','')}: ${fmt(d.borc)} | Min: ${fmt(minOd(d))}`).join('
-')}
-Sabit Krediler:
-${borclar.filter(d=>d.tip==='kredi').map(d=>`  - ${d.ad.replace('Kredi - ','')}: ${fmt(d.borc)} | ${d.taksit} taksit × ${fmt(d.taksitTutar)}`).join('
-')}
-
-Bu ay min ödemeler: ${fmt(topMin)}
-Bu ay yapılan ödemeler: ${fmt(buAyOdeme)}
-Bu ay harcamalar: ${fmt(buAyHar)}
-Bu ay net: ${fmt(topGelir-buAyOdeme-buAyHar)}`;
+  var buAy=new Date().getMonth();
+  var topGelir=gelirler.filter(function(g){return !g.skipAylar.includes(buAy);}).reduce(function(s,g){return s+g.tutar;},0);
+  var topBorc=borclar.reduce(function(s,d){return s+d.borc;},0);
+  var topMin=borclar.reduce(function(s,d){return s+minOd(d);},0);
+  var buAyHar=giderler.filter(function(g){return buAyMi(g.tarih);}).reduce(function(s,g){return s+g.tutar;},0);
+  var buAy2=new Date().getMonth(), buYil2=new Date().getFullYear();
+  var buAyOdeme=borclar.reduce(function(s,d){return s+((d.odemeler||{})[d.id+'_'+buAy2+'_'+buYil2]||0);},0);
+  var nl='\n';
+  var gelirSatir=gelirler.map(function(g){return '  - '+g.ad+': '+fmt(g.tutar)+(g.skipAylar.length?' ('+g.skipAylar.length+' ay yok)':'');}).join(nl);
+  var kmhSatir=borclar.filter(function(d){return d.tip==='kmh';}).map(function(d){return '  - '+d.ad.replace('KMH - ','')+': '+fmt(d.borc)+' Faiz:%'+d.faiz+' Min:'+fmt(minOd(d));}).join(nl);
+  var kkSatir=borclar.filter(function(d){return d.tip==='kredi_karti';}).map(function(d){return '  - '+d.ad.replace('K.Karti - ','')+': '+fmt(d.borc)+' Min:'+fmt(minOd(d));}).join(nl);
+  var krSatir=borclar.filter(function(d){return d.tip==='kredi';}).map(function(d){return '  - '+d.ad.replace('Kredi - ','')+': '+fmt(d.borc)+' '+d.taksit+'x'+fmt(d.taksitTutar);}).join(nl);
+  return '=== FINANSAL VERILER ===' + nl +
+    'Aylik gelir: '+fmt(topGelir)+nl+gelirSatir+nl+nl+
+    'Toplam borc: '+fmt(topBorc)+' (Borc/Gelir: %'+Math.round(topBorc/(topGelir||1)*100)+')'+nl+
+    'KMH borclari:'+nl+kmhSatir+nl+
+    'Kredi Kartlari:'+nl+kkSatir+nl+
+    'Sabit Krediler:'+nl+krSatir+nl+nl+
+    'Bu ay min odemeler: '+fmt(topMin)+nl+
+    'Bu ay yapilan odemeler: '+fmt(buAyOdeme)+nl+
+    'Bu ay harcamalar: '+fmt(buAyHar)+nl+
+    'Bu ay net: '+fmt(topGelir-buAyOdeme-buAyHar);
 }
 
 async function aiAPIcagir(prompt, hedefEl){
