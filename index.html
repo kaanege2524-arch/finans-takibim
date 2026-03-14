@@ -1259,8 +1259,8 @@ body{
           📅 Ay ay plan oluştur
         </button>
       </div>
-      <!-- Plan tablosu — her ay için gelir/min/ödeme satırı -->
-      <div id="planSonuc"></div>
+      <!-- Plan tablosu — yatay kaydırmalı -->
+      <div id="planSonuc" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
       <div id="planAIYorum"></div>
     </div>
   </div>
@@ -2616,7 +2616,7 @@ window.planHesapla = function planHesapla(){
 
   // Tablo HTML — 5 sütun: Ay | Gelir | Min Ödeme | Ödeme (input) | Kalan Borç
   const baslangicBorc = borclar.reduce((s,d)=>s+d.borc,0);
-  let html = '<div style="background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px">';
+  let html = '<div style="background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px;min-width:520px">';
   html += '<div style="background:var(--violet);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">';
   html += '<span style="font-size:12px;font-weight:600">📅 Ay Ay Ödeme Planı</span>';
   html += '<span style="font-size:11px;opacity:.8">'+(topKalan<=0?borcBitti+' ayda borçsuz':borcBitti+' ay')+'</span></div>';
