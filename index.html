@@ -64,8 +64,8 @@ body{
 /* ═══════════════════════════════════════════
    SAYFA GEÇİŞLERİ
 ═══════════════════════════════════════════ */
-.sayfa{display:none}
-.sayfa.aktif{display:block;animation:fadeIn .18s ease}
+.sayfa{display:none;overflow-x:hidden}
+.sayfa.aktif{display:block;animation:fadeIn .18s ease;overflow-x:auto}
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
 /* ═══════════════════════════════════════════
@@ -96,7 +96,7 @@ body{
 /* ═══════════════════════════════════════════
    ORTAK FORMLAR & KOMPONENTler
 ═══════════════════════════════════════════ */
-.content{padding:16px 14px}
+.content{padding:16px 14px;overflow-x:auto}
 
 .card{background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
 .card + .card{margin-top:8px}
@@ -1260,7 +1260,7 @@ body{
         </button>
       </div>
       <!-- Plan tablosu — yatay kaydırmalı -->
-      <div id="planSonuc" style="overflow-x:auto;-webkit-overflow-scrolling:touch"></div>
+      <div id="planSonuc" style="overflow-x:auto;-webkit-overflow-scrolling:touch;width:100%"></div>
       <div id="planAIYorum"></div>
     </div>
   </div>
@@ -2616,7 +2616,7 @@ window.planHesapla = function planHesapla(){
 
   // Tablo HTML — 5 sütun: Ay | Gelir | Min Ödeme | Ödeme (input) | Kalan Borç
   const baslangicBorc = borclar.reduce((s,d)=>s+d.borc,0);
-  let html = '<div style="background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px;min-width:520px">';
+  let html = '<div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px;min-width:480px">';
   html += '<div style="background:var(--violet);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">';
   html += '<span style="font-size:12px;font-weight:600">📅 Ay Ay Ödeme Planı</span>';
   html += '<span style="font-size:11px;opacity:.8">'+(topKalan<=0?borcBitti+' ayda borçsuz':borcBitti+' ay')+'</span></div>';
