@@ -678,7 +678,7 @@ body{
 }
 .ayar-kart{
   background:#fff;border-radius:20px;padding:20px;
-  max-width:400px;margin:60px auto 0;
+  max-width:400px;margin:40px auto 0;position:relative;z-index:100000;
 }
 .ayar-baslik{
   display:flex;justify-content:space-between;align-items:center;
@@ -799,7 +799,7 @@ body{
 <button class="ayar-btn" onclick="window.ayarAc()" id="ayarBtn" style="display:none">⚙️ Ayarlar</button>
 
 <!-- ── AYARLAR MODAL ── -->
-<div class="ayar-modal" id="ayarModal" onclick="if(event.target===this)window.ayarKapat()">
+<div id="ayarModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;padding:20px 14px;overflow-y:auto" onclick="if(event.target===this)window.ayarKapat()">
   <div class="ayar-kart">
     <div class="ayar-baslik">
       <h3>⚙️ Ayarlar</h3>
