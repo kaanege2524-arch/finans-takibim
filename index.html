@@ -2621,6 +2621,8 @@ window.planHesapla = function planHesapla(){
     html += '</div>';
     html += '<div id="planKalan_'+key+'" style="padding:7px 6px;font-size:11px;font-weight:600;color:'+borcRenk+';text-align:right">'+(s.toplamKalan<=0?'✅':fmtK(s.toplamKalan))+'</div>';
     html += '</div>';
+    // Dağılım satırı — tam genişlik
+    html += '<div id="planDagitim_'+key+'" style="grid-column:1/-1;padding:3px 10px 5px;display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--border);background:var(--surface2)"></div>';
     window.planAyOdemeleri[key] = s.topMinBu;
   });
 
@@ -2648,25 +2650,83 @@ window.planAyOdeSec = function planAyOdeSec(btn){
 }
 
 window.planGuncelle = function planGuncelle(){
-  // Input değerlerini topla ve kalan borcu yeniden hesapla
   const ps = window.planSatirlarData;
   if(!ps) return;
   const AYLAR2=['Oca','Seb','Mar','Nis','May','Haz','Tem','Agu','Eyl','Eki','Kas','Ara'];
-  let topBorc = borclar.reduce((s,d)=>s+d.borc,0);
-  let topOdeme = 0;
+  const baslangicBorc = borclar.reduce((s,d)=>s+d.borc,0);
+
+  // Borçları kopyala — simülasyon
+  var simB = borclar.filter(d=>d.tip==='kmh'||d.tip==='kredi_karti'||d.tip==='kredi').map(d=>({
+    id:d.id, ad:d.ad.replace(/KMH - |K\.Karti - |K\.Kartı - |Kredi - /,''),
+    tip:d.tip, borc:d.borc, faiz:d.faiz||0,
+    taksitTutar:d.taksitTutar||0, aktif:d.borc>0
+  }));
+
+  // Strateji sırası
+  if(planStratejisi==='avalanche') simB.sort((a,b)=>b.faiz-a.faiz);
+  else if(planStratejisi==='snowball') simB.sort((a,b)=>a.borc-b.borc);
+  else simB.sort((a,b)=>(b.faiz*b.borc)-(a.faiz*a.borc));
+
+  var topOdeme = 0;
+  var dagitimData = {}; // key → borç dağılımı array
+
   ps.forEach(s=>{
     const key = s.ay+'_'+s.yil;
     const inp = document.getElementById('planInp_'+key);
-    const odeme = inp ? Number(inp.value)||0 : s.topMinBu;
-    topOdeme += odeme;
-    topBorc = Math.max(0, topBorc - odeme + Math.round(topBorc*(borclar.filter(d=>d.tip==='kmh').reduce((ss,d)=>ss+d.faiz,0)/borclar.filter(d=>d.tip==='kmh').length||4.25)/100));
-    const el = document.getElementById('planKalan_'+key);
+    const topOd = inp ? Number(inp.value)||0 : s.topMinBu;
+    topOdeme += topOd;
+
+    // Faiz ekle
+    simB.forEach(d=>{ if(!d.aktif) return; if(d.tip!=='kredi') d.borc+=Math.round(d.borc*(d.faiz/100)); });
+
+    // Dağılım hesapla
+    var dagitim = [];
+    var kalanOdeme = topOd;
+
+    // Önce min ödemeler
+    simB.forEach(d=>{
+      if(!d.aktif||kalanOdeme<=0) return;
+      var minO = d.tip==='kredi'?(d.taksitTutar||0):(Math.round(d.borc*(d.faiz/100))+Math.ceil(d.borc*0.20));
+      var odeme = Math.min(minO, d.borc, kalanOdeme);
+      d.borc = Math.max(0, d.borc-odeme);
+      kalanOdeme -= odeme;
+      dagitim.push({ad:d.ad, tutar:odeme, tip:'min'});
+      if(d.borc<=0) d.aktif=false;
+    });
+
+    // Kalan ekstra parayı öncelikli borca
+    simB.forEach(d=>{
+      if(!d.aktif||kalanOdeme<=0) return;
+      var odeme = Math.min(kalanOdeme, d.borc);
+      d.borc = Math.max(0, d.borc-odeme);
+      kalanOdeme -= odeme;
+      var mevcut = dagitim.find(x=>x.ad===d.ad);
+      if(mevcut) mevcut.tutar+=odeme;
+      else dagitim.push({ad:d.ad, tutar:odeme, tip:'ekstra'});
+      if(d.borc<=0) d.aktif=false;
+    });
+
+    dagitimData[key] = dagitim;
+
+    var toplamKalan = simB.reduce((s,d)=>s+d.borc,0);
+    var el = document.getElementById('planKalan_'+key);
     if(el){
-      el.textContent = topBorc<=0?'✅':fmtK(topBorc);
-      el.style.color = topBorc<=0?'var(--emerald)':topBorc<borclar.reduce((s,d)=>s+d.borc,0)*0.5?'var(--sapphire)':'var(--ruby)';
+      el.textContent = toplamKalan<=0?'✅':fmtK(toplamKalan);
+      el.style.color = toplamKalan<=0?'var(--emerald)':toplamKalan<baslangicBorc*0.5?'var(--sapphire)':'var(--ruby)';
+    }
+
+    // Dağılım satırını güncelle
+    var dagEl = document.getElementById('planDagitim_'+key);
+    if(dagEl && dagitim.length>0){
+      var dhtml = dagitim.filter(d=>d.tutar>0).map(d=>{
+        var renk = d.tutar>0?'var(--sapphire)':'var(--text3)';
+        return '<span style="font-size:9px;padding:1px 6px;border-radius:12px;background:var(--sapphire-lt);color:var(--sapphire);margin:1px">'+d.ad+' '+fmtK(d.tutar)+'</span>';
+      }).join('');
+      dagEl.innerHTML = dhtml;
     }
   });
-  const totEl = document.getElementById('planToplamOdeme');
+
+  var totEl = document.getElementById('planToplamOdeme');
   if(totEl) totEl.textContent = 'Toplam: '+fmt(topOdeme);
 }
 
