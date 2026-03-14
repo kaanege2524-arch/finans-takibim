@@ -2478,10 +2478,31 @@ function odFiltreDegis(k){ odFiltre=k; odRender(); }
 let planStratejisi = 'avalanche';
 let projAySayisi = 6;
 
+function aiVeriGuncelle(){
+  // Mevcut veri özetini chat'e bilgi olarak ekle (görünmez sistem mesajı değil, sessiz güncelleme)
+  // Sadece son mesajdan bu yana veri değiştiyse göster
+  const yeniOzet = aiVeriOzeti();
+  if(window._sonAiVeri !== yeniOzet){
+    window._sonAiVeri = yeniOzet;
+    if(aiBaslandi){
+      // Chat'te küçük güncelleme bildirimi
+      const chat = document.getElementById('aiChat');
+      const el = document.getElementById('aiVeriGuncelBilgi');
+      if(el) el.remove();
+      const div = document.createElement('div');
+      div.id = 'aiVeriGuncelBilgi';
+      div.style.cssText = 'font-size:10px;color:var(--text3);text-align:center;padding:4px;border-top:1px solid var(--bg);margin:4px 0';
+      div.textContent = 'Veriler guncellendi';
+      if(chat) chat.appendChild(div);
+    }
+  }
+}
+
 function aiInit(){
   if(aiBaslandi) return;
   aiBaslandi=true;
-  aiMesajEkle('ai','Merhaba! 👋 Gerçek finansal verilerinize dayanarak borç stratejisi, projeksiyon ve bütçe analizi yapabilirim. Ne öğrenmek istersiniz?');
+  const veri = aiVeriOzeti();
+  aiMesajEkle('ai','Merhaba! Verileriniz yuklendi. Toplam borcunuz: '+veri.split('Toplam borc: ')[1]?.split('\n')[0]||'hesaplaniyor...');
 }
 
 function aiSekmeGec(sekme){
@@ -2489,8 +2510,9 @@ function aiSekmeGec(sekme){
     document.getElementById('aiTab-'+s).style.display = s===sekme?'':'none';
     document.getElementById('aiSekme-'+s).classList.toggle('aktif', s===sekme);
   });
-  if(sekme==='analiz') aiAnalizOlustur();
+  if(sekme==='analiz'){ analizYuklendi=false; aiAnalizOlustur(); }
   if(sekme==='proj') aiProjGoster(projAySayisi);
+  if(sekme==='sohbet') aiVeriGuncelle();
 }
 
 window.planStrSec = function(str){
