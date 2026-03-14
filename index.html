@@ -1244,31 +1244,19 @@ body{
   <!-- BORÇ PLANI -->
   <div id="aiTab-plan" style="display:none">
     <div class="content">
-      <!-- Ayar paneli -->
-      <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px;margin-bottom:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;margin-bottom:10px">Plan Ayarları</div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <div style="flex:1">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Aylık ekstra ödeme</div>
-            <input type="number" id="planBudget" class="fi" placeholder="0" oninput="planOnizle()" style="font-size:13px"/>
-          </div>
-          <div style="flex:1">
-            <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Hesaplama</div>
-            <div id="planOnizleSonuc" style="font-size:12px;color:var(--violet);font-weight:600;padding:10px 0">—</div>
-          </div>
-        </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="planStratejiRow">
-          <button class="ai-oneri aktif-plan" id="planStr-avalanche" onclick="planStrSec('avalanche')">🏔️ Çığ</button>
-          <button class="ai-oneri" id="planStr-snowball" onclick="planStrSec('snowball')">⛄ Kartopu</button>
+      <!-- Strateji + başlat -->
+      <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:12px;margin-bottom:10px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="planStratejiRow">
+          <button class="ai-oneri aktif-plan" id="planStr-avalanche" onclick="planStrSec('avalanche')">🏔️ Çığ (yüksek faiz önce)</button>
+          <button class="ai-oneri" id="planStr-snowball" onclick="planStrSec('snowball')">⛄ Kartopu (küçük borç önce)</button>
           <button class="ai-oneri" id="planStr-hybrid" onclick="planStrSec('hybrid')">⚡ Karma</button>
         </div>
         <button onclick="planHesapla()" style="width:100%;background:var(--violet);color:#fff;border:none;border-radius:var(--radius-sm);padding:11px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">
           📅 Ay ay plan oluştur
         </button>
       </div>
-      <!-- Plan tablosu -->
+      <!-- Plan tablosu — her ay için gelir/min/ödeme satırı -->
       <div id="planSonuc"></div>
-      <!-- AI yorum -->
       <div id="planAIYorum"></div>
     </div>
   </div>
@@ -2499,7 +2487,7 @@ function aiSekmeGec(sekme){
   if(sekme==='proj') aiProjGoster(projAySayisi);
 }
 
-function planStrSec(str){
+window.planStrSec = function(str){
   planStratejisi=str;
   document.querySelectorAll('#planStratejiRow .ai-oneri').forEach(b=>b.classList.remove('aktif-plan'));
   document.getElementById('planStr-'+str).classList.add('aktif-plan');
@@ -2513,20 +2501,8 @@ function projAySec(ay, btn){
 }
 
 // ── BORÇ PLANI ────────────────────────────────────────────────────────
-function planOnizle(){
-  const ekstra = Number(document.getElementById('planBudget').value)||0;
-  const buAy = new Date().getMonth();
-  const topGelir = gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
-  const topMin = borclar.reduce((s,d)=>s+minOd(d),0);
-  const serbest = topGelir - topMin + ekstra;
-  const el = document.getElementById('planOnizleSonuc');
-  if(serbest<=0){ el.style.color='var(--ruby)'; el.textContent='Yetersiz bütçe'; return; }
-  el.style.color='var(--violet)';
-  el.textContent = fmt(serbest)+'/ay serbest';
-}
-
-function planHesapla(){
-  const ekstra = Number(document.getElementById('planBudget').value)||0;
+window.planHesapla = function planHesapla(){
+  const ekstra = 0;
   const el = document.getElementById('planSonuc');
   const elAI = document.getElementById('planAIYorum');
   el.innerHTML = '';
@@ -2607,39 +2583,56 @@ function planHesapla(){
   const borcBitti = planSatirlar.length;
   const topKalan = simBorclar.reduce((s,d)=>s+d.borc,0);
 
-  // Tablo HTML
-  let html = `<div style="background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px">
-    <div style="background:var(--violet);color:#fff;padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:12px;font-weight:600">📅 Ay Ay Ödeme Planı</span>
-      <span style="font-size:11px;opacity:.8">${topKalan<=0?borcBitti+' ayda borçsuz':''+borcBitti+' ay hesaplandı'}</span>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:11px">
-      <thead><tr style="background:var(--surface2);border-bottom:1px solid var(--border)">
-        <th style="padding:7px 10px;text-align:left;color:var(--text3);font-weight:600">Ay</th>
-        <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:600">Gelir</th>
-        <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:600">Ödeme</th>
-        <th style="padding:7px 10px;text-align:right;color:var(--text3);font-weight:600">Kalan Borç</th>
-      </tr></thead><tbody>`;
+  // Her ay için ödeme input'ları saklayacak obje
+  window.planAyOdemeleri = {};
 
+  // Tablo HTML — 5 sütun: Ay | Gelir | Min Ödeme | Ödeme (input) | Kalan Borç
+  const baslangicBorc = borclar.reduce((s,d)=>s+d.borc,0);
+  let html = '<div style="background:var(--surface);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:10px">';
+  html += '<div style="background:var(--violet);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center">';
+  html += '<span style="font-size:12px;font-weight:600">📅 Ay Ay Ödeme Planı</span>';
+  html += '<span style="font-size:11px;opacity:.8">'+(topKalan<=0?borcBitti+' ayda borçsuz':borcBitti+' ay')+'</span></div>';
+
+  // Başlık satırı
+  html += '<div style="display:grid;grid-template-columns:52px 1fr 1fr 1fr 1fr;border-bottom:1.5px solid var(--border);background:var(--surface2)">';
+  ['Ay','Gelir','Min Ödeme','Ödeyeceğim','Kalan Borç'].forEach(h=>{
+    html += '<div style="padding:7px 6px;font-size:9px;font-weight:600;color:var(--text3);text-align:right;letter-spacing:.3px;text-transform:uppercase">'+h+'</div>';
+  });
+  html += '</div>';
+
+  // Veri satırları
   planSatirlar.forEach((s,i)=>{
-    const pct = Math.max(0,100-Math.round(s.toplamKalan/borclar.reduce((ss,d)=>ss+d.borc,0)*100));
-    const renk = s.toplamKalan<=0?'var(--emerald)':pct>60?'var(--sapphire)':'var(--text1)';
-    html+=`<tr style="border-bottom:1px solid var(--bg)${i%2===0?';background:var(--surface2)':''}">
-      <td style="padding:5px 10px;color:var(--text2);font-weight:500">${AYLAR2[s.ay]} ${s.yil}</td>
-      <td style="padding:5px 10px;text-align:right;color:var(--emerald)">${fmtK(s.ayGelir)}</td>
-      <td style="padding:5px 10px;text-align:right;color:var(--ruby)">${fmtK(s.topMinBu)}</td>
-      <td style="padding:5px 10px;text-align:right;font-weight:600;color:${renk}">${s.toplamKalan<=0?'✅ Bitti':fmtK(s.toplamKalan)}</td>
-    </tr>`;
+    const pct = Math.max(0,100-Math.round(s.toplamKalan/baslangicBorc*100));
+    const borcRenk = s.toplamKalan<=0?'var(--emerald)':pct>60?'var(--sapphire)':'var(--ruby)';
+    const key = s.ay+'_'+s.yil;
+    html += '<div style="display:grid;grid-template-columns:52px 1fr 1fr 1fr 1fr;border-bottom:1px solid var(--bg);'+(i%2===0?'background:var(--surface2)':'')+'">';
+    html += '<div style="padding:7px 6px;font-size:11px;color:var(--text2);font-weight:500;text-align:center">'+AYLAR2[s.ay]+'</div>';
+    html += '<div style="padding:7px 6px;font-size:11px;color:var(--emerald);font-weight:500;text-align:right">'+fmtK(s.ayGelir)+'</div>';
+    html += '<div style="padding:7px 6px;font-size:11px;color:var(--text2);text-align:right">'+fmtK(s.topMinBu)+'</div>';
+    // Ödeme input — min/x2/özel
+    var btnStyle = "flex:1;font-size:9px;padding:3px;border-radius:4px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-family:'Sora',sans-serif;color:var(--text2)";
+    html += '<div style="padding:4px 4px;display:flex;flex-direction:column;gap:3px">';
+    html += '<div style="display:flex;gap:2px">';
+    html += '<button data-key="'+key+'" data-val="'+s.topMinBu+'" onclick="planAyOdeSec(this)" style="'+btnStyle+'">Min</button>';
+    html += '<button data-key="'+key+'" data-val="'+Math.round(s.topMinBu*1.5)+'" onclick="planAyOdeSec(this)" style="'+btnStyle+'">1.5x</button>';
+    html += '<button data-key="'+key+'" data-val="'+s.topMinBu*2+'" onclick="planAyOdeSec(this)" style="'+btnStyle+'">2x</button>';
+    html += '</div>';
+    html += '<input type="number" id="planInp_'+key+'" value="'+s.topMinBu+'" oninput="planGuncelle()" style="width:100%;padding:3px 5px;border:1.5px solid var(--violet-lt);border-radius:5px;font-size:11px;font-family:\'Sora\',sans-serif;text-align:right;outline:none"/>';
+    html += '</div>';
+    html += '<div id="planKalan_'+key+'" style="padding:7px 6px;font-size:11px;font-weight:600;color:'+borcRenk+';text-align:right">'+(s.toplamKalan<=0?'✅':fmtK(s.toplamKalan))+'</div>';
+    html += '</div>';
+    window.planAyOdemeleri[key] = s.topMinBu;
   });
 
-  html+=`</tbody></table>
-    <div style="padding:10px 14px;background:var(--violet-lt);border-top:1px solid var(--border);display:flex;justify-content:space-between">
-      <span style="font-size:11px;color:var(--violet);font-weight:600">Tahmini toplam faiz</span>
-      <span style="font-size:11px;color:var(--ruby);font-weight:600">${fmt(toplamFaiz)}</span>
-    </div>
-  </div>`;
+  html += '<div style="padding:9px 14px;background:var(--violet-lt);border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr">';
+  html += '<div style="font-size:10px;color:var(--violet);font-weight:600">Tahmini faiz</div>';
+  html += '<div style="font-size:10px;color:var(--ruby);font-weight:600;text-align:center">'+fmt(toplamFaiz)+'</div>';
+  html += '<div id="planToplamOdeme" style="font-size:10px;color:var(--text2);font-weight:600;text-align:right"></div>';
+  html += '</div></div>';
 
   el.innerHTML = html;
+  // planSatirlar'ı global sakla
+  window.planSatirlarData = planSatirlar;
 
   // AI yorumu iste
   elAI.innerHTML = `<button onclick="planAIYorumAl(${borcBitti},${Math.round(toplamFaiz)})" style="width:100%;background:var(--ink);color:#fff;border:none;border-radius:var(--radius);padding:11px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:14px">
@@ -2647,7 +2640,37 @@ function planHesapla(){
   </button>`;
 }
 
-function planAIYorumAl(aylar, toplamFaiz){
+window.planAyOdeSec = function planAyOdeSec(btn){
+  const key = btn.dataset.key;
+  const tutar = btn.dataset.val;
+  const inp = document.getElementById('planInp_'+key);
+  if(inp){ inp.value = Math.round(tutar); planGuncelle(); }
+}
+
+window.planGuncelle = function planGuncelle(){
+  // Input değerlerini topla ve kalan borcu yeniden hesapla
+  const ps = window.planSatirlarData;
+  if(!ps) return;
+  const AYLAR2=['Oca','Seb','Mar','Nis','May','Haz','Tem','Agu','Eyl','Eki','Kas','Ara'];
+  let topBorc = borclar.reduce((s,d)=>s+d.borc,0);
+  let topOdeme = 0;
+  ps.forEach(s=>{
+    const key = s.ay+'_'+s.yil;
+    const inp = document.getElementById('planInp_'+key);
+    const odeme = inp ? Number(inp.value)||0 : s.topMinBu;
+    topOdeme += odeme;
+    topBorc = Math.max(0, topBorc - odeme + Math.round(topBorc*(borclar.filter(d=>d.tip==='kmh').reduce((ss,d)=>ss+d.faiz,0)/borclar.filter(d=>d.tip==='kmh').length||4.25)/100));
+    const el = document.getElementById('planKalan_'+key);
+    if(el){
+      el.textContent = topBorc<=0?'✅':fmtK(topBorc);
+      el.style.color = topBorc<=0?'var(--emerald)':topBorc<borclar.reduce((s,d)=>s+d.borc,0)*0.5?'var(--sapphire)':'var(--ruby)';
+    }
+  });
+  const totEl = document.getElementById('planToplamOdeme');
+  if(totEl) totEl.textContent = 'Toplam: '+fmt(topOdeme);
+}
+
+window.planAIYorumAl = function planAIYorumAl(aylar, toplamFaiz){
   const el = document.getElementById('planAIYorum');
   el.innerHTML = '<div style="text-align:center;padding:12px"><div class="ai-yukleniyor"><span></span><span></span><span></span></div></div>';
   const ekstra = Number(document.getElementById('planBudget').value)||0;
