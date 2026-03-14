@@ -2472,6 +2472,30 @@ Gerçek verilere dayanarak kısa, pratik, net cevaplar ver. Türkçe konuş.`,
 // BAŞLAT
 // ════════════════════════════════════════════════════════════════════
 ozRender();
+
+(async function(){
+  try{
+    syncGoster('sync');
+    const row = await sbYukle();
+    if(!row){ syncGoster('hata'); return; }
+    const sbZaman = row.updated_at ? new Date(row.updated_at) : new Date(0);
+    const lsZaman = localStorage.getItem('ft2_guncelleme') ? new Date(localStorage.getItem('ft2_guncelleme')) : new Date(0);
+    if(sbZaman > lsZaman){
+      if(row.gelirler) { try{gelirler=JSON.parse(row.gelirler);localStorage.setItem('ft2_gelirler',row.gelirler);}catch(e){} }
+      if(row.borclar)  { try{borclar=JSON.parse(row.borclar);localStorage.setItem('ft2_borclar',row.borclar);}catch(e){} }
+      if(row.giderler) { try{giderler=JSON.parse(row.giderler);localStorage.setItem('ft2_giderler',row.giderler);}catch(e){} }
+      localStorage.setItem('ft2_guncelleme', row.updated_at||new Date().toISOString());
+      ozRender();
+      console.log('Supabase verisi yuklendi:', row.updated_at);
+    } else {
+      console.log('localStorage daha guncel, sync yok');
+    }
+    syncGoster('ok');
+  }catch(e){
+    console.log('Supabase yukle hatasi:', e);
+    syncGoster('hata');
+  }
+})();
 </script>
 </body>
 </html>
