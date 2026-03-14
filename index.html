@@ -1009,11 +1009,15 @@ body{
   <div class="content">
     <div class="minoz"><div class="mbt">⚠️ Bu ay minimum ödemeler</div><div id="bMinIc"></div></div>
     <div class="sbaslik s-kmh" onclick="tog('bKmhIc','bOkKmh')"><span class="sb-ikon">🏦</span><span class="sb-ad">KMH</span><span class="bdg b-kmh" id="bKmhBdg">0</span><span class="sb-ok" id="bOkKmh">▼</span></div>
-    <div id="bKmhIc"><div id="bKmhL"></div><button class="ekle-borc" style="background:#8e44ad" onclick="bFormAc('kmh',null)">+ KMH Ekle</button></div>
+    <div id="bKmhIc"><div id="bKmhL"></div></div>
     <div class="sbaslik s-kk" onclick="tog('bKkIc','bOkKk')"><span class="sb-ikon">💳</span><span class="sb-ad">Kredi Kartları</span><span class="bdg b-kk" id="bKkBdg">0</span><span class="sb-ok" id="bOkKk">▼</span></div>
-    <div id="bKkIc"><div id="bKkL"></div><button class="ekle-borc" style="background:#e67e22" onclick="bFormAc('kredi_karti',null)">+ Kredi Kartı Ekle</button></div>
+    <div id="bKkIc"><div id="bKkL"></div></div>
     <div class="sbaslik s-kr" onclick="tog('bKrIc','bOkKr')"><span class="sb-ikon">📋</span><span class="sb-ad">Sabit Krediler</span><span class="bdg b-kr" id="bKrBdg">0</span><span class="sb-ok" id="bOkKr">▼</span></div>
-    <div id="bKrIc"><div id="bKrL"></div><button class="ekle-borc" style="background:#2980b9" onclick="bFormAc('kredi',null)">+ Sabit Kredi Ekle</button></div>
+    <div id="bKrIc"><div id="bKrL"></div></div>
+    <!-- Tek borç ekle butonu -->
+    <button onclick="bFormAc(null,null)" style="width:100%;background:var(--ink);color:#fff;border:none;border-radius:var(--radius);padding:13px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+      <span style="font-size:16px">＋</span> Borç Ekle
+    </button>
     <!-- Borç formu -->
     <div class="borc-form" id="bFrm" style="display:none">
       <div class="borc-fbaslik" id="bFBas">➕ Yeni Borç</div>
