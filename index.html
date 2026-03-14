@@ -796,10 +796,10 @@ body{
 </div>
 
 <!-- ── AYARLAR BUTONU ── -->
-<button class="ayar-btn" onclick="ayarAc()" id="ayarBtn" style="display:none">⚙️ Ayarlar</button>
+<button class="ayar-btn" onclick="window.ayarAc()" id="ayarBtn" style="display:none">⚙️ Ayarlar</button>
 
 <!-- ── AYARLAR MODAL ── -->
-<div class="ayar-modal" id="ayarModal">
+<div class="ayar-modal" id="ayarModal" onclick="if(event.target===this)window.ayarKapat()">
   <div class="ayar-kart">
     <div class="ayar-baslik">
       <h3>⚙️ Ayarlar</h3>
@@ -1479,8 +1479,8 @@ function pinDegistir(){
   document.getElementById('ayarBtn').style.display='none';
 }
 
-function ayarAc(){ document.getElementById('ayarModal').style.display=''; }
-function ayarKapat(){ document.getElementById('ayarModal').style.display='none'; }
+window.ayarAc = function ayarAc(){ document.getElementById('ayarModal').style.display=''; }
+window.ayarKapat = function ayarKapat(){ document.getElementById('ayarModal').style.display='none'; }
 
 
 function veriSifirla(){
