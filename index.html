@@ -2913,7 +2913,9 @@ async function aiGonder(){
   input.value='';
   aiMesajEkle('user',soru);
   aiMesajYukleniyor();
-  const gecmis=aiMesajlar.slice(-8).map(m=>({role:m.tip==='user'?'user':'assistant',content:m.metin}));
+  // Her sorguda güncel veriyi al
+  const guncelVeri = aiVeriOzeti();
+  const gecmis=aiMesajlar.slice(-6).map(m=>({role:m.tip==='user'?'user':'assistant',content:m.metin}));
   try{
     const resp=await fetch('https://finans-proxy.kaanege2524.workers.dev',{
       method:'POST',
@@ -2921,10 +2923,10 @@ async function aiGonder(){
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:1200,
-        system:`Sen bir Türk kişisel finans danışmanısın. Kullanıcının güncel finansal verileri:
-${aiVeriOzeti()}
+        system:'Sen bir Turk kisisel finans danismanisın. Kullanicinin GUNCEL verileri: '+guncelVeri+' Kisa pratik net Turkce cevaplar ver.',
 
-Gerçek verilere dayanarak kısa, pratik, net cevaplar ver. Türkçe konuş.`,
+
+
         messages:[...gecmis,{role:'user',content:soru}]
       })
     });
