@@ -2629,28 +2629,50 @@ window.planHesapla = function planHesapla(){
   html += '</div>';
 
   // Veri satırları
-  planSatirlar.forEach((s,i)=>{
-    const pct = Math.max(0,100-Math.round(s.toplamKalan/baslangicBorc*100));
-    const borcRenk = s.toplamKalan<=0?'var(--emerald)':pct>60?'var(--sapphire)':'var(--ruby)';
-    const key = s.ay+'_'+s.yil;
-    html += '<div style="display:grid;grid-template-columns:52px 1fr 1fr 1fr 1fr;border-bottom:1px solid var(--bg);'+(i%2===0?'background:var(--surface2)':'')+'">';
-    html += '<div style="padding:7px 6px;font-size:11px;color:var(--text2);font-weight:500;text-align:center">'+AYLAR2[s.ay]+'</div>';
-    html += '<div style="padding:7px 6px;font-size:11px;color:var(--emerald);font-weight:500;text-align:right">'+fmtK(s.ayGelir)+'</div>';
-    html += '<div style="padding:7px 6px;font-size:11px;color:var(--text2);text-align:right">'+fmtK(s.topMinBu)+'</div>';
-    // Ödeme input — tamamı / özel
-    var kalanGelir = Math.max(0, s.ayGelir - s.topMinBu);
-    html += '<div style="padding:3px 4px">';
-    html += '<div style="display:flex;gap:2px;margin-bottom:2px">';
-    html += '<button data-key="'+key+'" data-val="'+s.topMinBu+'" onclick="planAyOdeSec(this)" style="flex:1;font-size:9px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-family:\'Sora\',sans-serif;color:var(--text3)">Min</button>';
-    html += '<button data-key="'+key+'" data-val="'+s.ayGelir+'" onclick="planAyOdeSec(this)" style="flex:1;font-size:9px;padding:2px 4px;border-radius:4px;border:1px solid var(--emerald-lt);background:var(--emerald-lt);cursor:pointer;font-family:\'Sora\',sans-serif;color:var(--emerald)">Tamamı</button>';
+  planSatirlar.forEach(function(s,i){
+    var key = s.ay+'_'+s.yil;
+    var odeme = s.topMinBu;
+    var kalanBorc = s.toplamKalan;
+    // Kalan borç rengi: sıfır=yeşil, azaldıysa mavi, artıysa kırmızı
+    var borcRenk = kalanBorc<=0?'var(--emerald)':kalanBorc<baslangicBorc?'var(--sapphire)':'var(--ruby)';
+    var kalanText = kalanBorc<=0?'✅ Bitti':fmtK(kalanBorc);
+
+    // Accordion başlık — ay adı + özet
+    html += '<div style="border-bottom:1px solid var(--border)">';
+    html += '<div onclick="planAyToggle(\''+key+'\', this)" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;background:var(--surface);user-select:none">';
+    html += '<div style="display:flex;align-items:center;gap:10px">';
+    html += '<span style="font-size:13px;font-weight:600;color:var(--text1)">'+AYLAR2[s.ay]+' '+s.yil+'</span>';
+    html += '<span style="font-size:10px;color:var(--emerald)">'+fmtK(s.ayGelir)+'</span>';
     html += '</div>';
-    html += '<input type="number" id="planInp_'+key+'" value="'+s.topMinBu+'" placeholder="Tutar gir" oninput="planGuncelle()" style="width:100%;padding:3px 5px;border:1.5px solid var(--violet-lt);border-radius:5px;font-size:11px;font-family:\'Sora\',sans-serif;text-align:right;outline:none"/>';
+    html += '<div style="display:flex;align-items:center;gap:8px">';
+    html += '<span style="font-size:12px;font-weight:600;color:'+borcRenk+'">'+kalanText+'</span>';
+    html += '<span style="font-size:11px;color:var(--text3)" id="planOk_'+key+'">▼</span>';
+    html += '</div></div>';
+
+    // Accordion içerik — başlangıçta kapalı (sadece ilk ay açık)
+    html += '<div id="planIc_'+key+'" style="display:'+(i===0?'block':'none')+';background:var(--surface2);padding:12px 14px;border-top:1px solid var(--bg)">';
+
+    // Bilgi satırı
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">';
+    html += '<div><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Gelir</div>';
+    html += '<div style="font-size:13px;font-weight:600;color:var(--emerald)">'+fmtK(s.ayGelir)+'</div></div>';
+    html += '<div><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Min Ödeme</div>';
+    html += '<div style="font-size:13px;font-weight:600;color:var(--ruby)">'+fmtK(s.topMinBu)+'</div></div>';
+    html += '<div><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px">Kalan</div>';
+    html += '<div id="planKalanIc_'+key+'" style="font-size:13px;font-weight:600;color:'+borcRenk+'">'+kalanText+'</div></div>';
     html += '</div>';
+
+    // Ödeme input
+    html += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">';
+    html += '<button data-key="'+key+'" data-val="'+s.topMinBu+'" onclick="planAyOdeSec(this)" style="flex:0;padding:6px 12px;font-size:11px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;font-family:\'Sora\',sans-serif;color:var(--text2)">Min</button>';
+    html += '<button data-key="'+key+'" data-val="'+s.ayGelir+'" onclick="planAyOdeSec(this)" style="flex:0;padding:6px 12px;font-size:11px;border-radius:8px;border:1px solid var(--emerald-lt);background:var(--emerald-lt);cursor:pointer;font-family:\'Sora\',sans-serif;color:var(--emerald)">Tamamı</button>';
+    html += '<input type="number" id="planInp_'+key+'" value="'+s.topMinBu+'" placeholder="Tutar gir" oninput="planGuncelle()" style="flex:1;padding:8px 10px;border:1.5px solid var(--violet-lt);border-radius:8px;font-size:12px;font-family:\'Sora\',sans-serif;text-align:right;outline:none"/>';
     html += '</div>';
-    html += '<div id="planKalan_'+key+'" style="padding:7px 6px;font-size:11px;font-weight:600;color:'+borcRenk+';text-align:right">'+(s.toplamKalan<=0?'✅':fmtK(s.toplamKalan))+'</div>';
-    html += '</div>';
-    // Dağılım satırı — tam genişlik
-    html += '<div id="planDagitim_'+key+'" style="grid-column:1/-1;padding:3px 10px 5px;display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--border);background:var(--surface2)"></div>';
+
+    // Dağılım
+    html += '<div id="planDagitim_'+key+'" style="display:flex;flex-wrap:wrap;gap:4px"></div>';
+    html += '</div></div>';
+
     window.planAyOdemeleri[key] = s.topMinBu;
   });
 
@@ -2668,6 +2690,15 @@ window.planHesapla = function planHesapla(){
   elAI.innerHTML = `<button onclick="planAIYorumAl(${borcBitti},${Math.round(toplamFaiz)})" style="width:100%;background:var(--ink);color:#fff;border:none;border-radius:var(--radius);padding:11px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;margin-bottom:14px">
     🤖 AI ile Plan Yorumu ve Öneriler Al
   </button>`;
+}
+
+window.planAyToggle = function planAyToggle(key, header){
+  var ic = document.getElementById('planIc_'+key);
+  var ok = document.getElementById('planOk_'+key);
+  if(!ic) return;
+  var acik = ic.style.display !== 'none';
+  ic.style.display = acik ? 'none' : 'block';
+  if(ok) ok.textContent = acik ? '▼' : '▲';
 }
 
 window.planAyOdeSec = function planAyOdeSec(btn){
@@ -2737,7 +2768,7 @@ window.planGuncelle = function planGuncelle(){
     dagitimData[key] = dagitim;
 
     var toplamKalan = simB.reduce((s,d)=>s+d.borc,0);
-    var el = document.getElementById('planKalan_'+key);
+    var el = document.getElementById('planKalanIc_'+key) || document.getElementById('planKalan_'+key);
     if(el){
       el.textContent = toplamKalan<=0?'✅':fmtK(toplamKalan);
       el.style.color = toplamKalan<=0?'var(--emerald)':toplamKalan<baslangicBorc*0.5?'var(--sapphire)':'var(--ruby)';
