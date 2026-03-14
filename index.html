@@ -1582,7 +1582,10 @@ function ozRender(){
   const nakitHar = giderler.filter(g=>buAyMi(g.tarih)&&g.tip==='nakit').reduce((s,g)=>s+g.tutar,0);
   const net = topGelir - gercekOdeme - nakitHar;
 
-  const topBorc = borclar.reduce((s,d)=>s+d.borc, 0);
+  const topBorc = borclar.reduce((s,d)=>{
+    var taksitTop = (d.taksitPlani||[]).reduce(function(ss,p){return ss+p.tutar;},0);
+    return s+d.borc+taksitTop;
+  }, 0);
 
   // ── DOM ──
   document.getElementById('ozGelir').textContent   = fmtK(topGelir);
@@ -1725,13 +1728,19 @@ let bEditId=null, bSecTip='kmh';
 function bRender(){
   const gn=new Date().getDate();
   const km=borclar.filter(d=>d.tip==='kmh'), kk=borclar.filter(d=>d.tip==='kredi_karti'), kr=borclar.filter(d=>d.tip==='kredi');
-  const tB=borclar.reduce((s,d)=>s+d.borc,0), tM=borclar.reduce((s,d)=>s+minOd(d),0);
+  const tB=borclar.reduce((s,d)=>{
+    var taksitTop=(d.taksitPlani||[]).reduce(function(ss,p){return ss+p.tutar;},0);
+    return s+d.borc+taksitTop;
+  },0), tM=borclar.reduce((s,d)=>s+minOd(d),0);
   const topGelir=gelirler.filter(g=>!g.skipAylar.includes(new Date().getMonth())).reduce((s,g)=>s+g.tutar,0);
   document.getElementById('bTB').textContent=fmtK(tB);
   document.getElementById('bTM').textContent=fmtK(tM);
   document.getElementById('bOR').textContent = '%'+Math.round(tB/(topGelir||1)*100);
   document.getElementById('bKmhBdg').textContent=km.length+' · '+fmtK(km.reduce((s,d)=>s+d.borc,0));
-  document.getElementById('bKkBdg').textContent=kk.length+' · '+fmtK(kk.reduce((s,d)=>s+d.borc,0));
+  document.getElementById('bKkBdg').textContent=kk.length+' · '+fmtK(kk.reduce((s,d)=>{
+    var tp=(d.taksitPlani||[]).reduce(function(ss,p){return ss+p.tutar;},0);
+    return s+d.borc+tp;
+  },0));
   document.getElementById('bKrBdg').textContent=kr.length+' · '+fmtK(kr.reduce((s,d)=>s+d.borc,0));
   const kmM=km.reduce((s,d)=>s+minOd(d),0),kkM=kk.reduce((s,d)=>s+minOd(d),0),krM=kr.reduce((s,d)=>s+minOd(d),0);
   document.getElementById('bMinIc').innerHTML=
