@@ -1178,6 +1178,13 @@ async function sbYukle(){
 async function sbKaydet(payload){
   try{
     // Upsert — varsa güncelle yoksa ekle
+    const body = JSON.stringify({
+        user_id: SB_USER,
+        gelirler: JSON.stringify(gelirler),
+        borclar:  JSON.stringify(borclar),
+        giderler: JSON.stringify(giderler),
+        guncelleme: new Date().toISOString()
+      });
     const r = await fetch(SB_URL+'/rest/v1/finans_data',{
       method:'POST',
       headers:{
@@ -1186,14 +1193,12 @@ async function sbKaydet(payload){
         'Content-Type':'application/json',
         'Prefer':'resolution=merge-duplicates'
       },
-      body:JSON.stringify({
-        user_id: SB_USER,
-        gelirler: JSON.stringify(gelirler),
-        borclar:  JSON.stringify(borclar),
-        giderler: JSON.stringify(giderler),
-        guncelleme: new Date().toISOString()
-      })
+      body:body
     });
+    if(!r.ok){
+      const err = await r.text();
+      console.error('Supabase 400:', err);
+    }
     return r.ok;
   }catch(e){ console.log('Supabase kaydet hatası:',e); return false; }
 }
