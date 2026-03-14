@@ -626,6 +626,84 @@ body{
    AI
 ═══════════════════════════════════════════ */
 .ai-header{background:linear-gradient(150deg,#1e1245,#4c1d95)}
+/* ── PIN GİRİŞ EKRANI ── */
+.pin-overlay{
+  position:fixed;inset:0;
+  background:linear-gradient(150deg,#0d1117 0%,#1a3a5c 100%);
+  z-index:9999;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:32px 24px;
+}
+.pin-logo{font-size:40px;margin-bottom:8px}
+.pin-baslik{font-size:20px;font-weight:600;color:#fff;margin-bottom:4px}
+.pin-alt{font-size:12px;color:rgba(255,255,255,.4);margin-bottom:40px}
+.pin-noktalar{display:flex;gap:14px;margin-bottom:40px}
+.pin-nokta{
+  width:14px;height:14px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.3);
+  background:transparent;transition:all .15s;
+}
+.pin-nokta.dolu{background:#fff;border-color:#fff}
+.pin-klavye{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:12px;width:100%;max-width:260px;
+}
+.pin-tus{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);
+  border-radius:14px;padding:18px 0;
+  font-size:20px;font-weight:500;color:#fff;
+  cursor:pointer;text-align:center;
+  font-family:'Sora',sans-serif;
+  transition:all .1s;user-select:none;
+}
+.pin-tus:active{background:rgba(255,255,255,.2);transform:scale(.95)}
+.pin-tus.sil{font-size:16px;color:rgba(255,255,255,.6)}
+.pin-tus.bos{background:transparent;border-color:transparent;cursor:default}
+.pin-hata{color:#ff6b6b;font-size:12px;margin-top:-28px;margin-bottom:28px;min-height:16px}
+.pin-ilk-bilgi{font-size:11px;color:rgba(255,255,255,.5);margin-top:24px;text-align:center}
+
+/* ── AYARLAR ── */
+.ayar-btn{
+  position:fixed;top:12px;right:12px;z-index:200;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  border-radius:20px;padding:5px 12px;
+  font-size:11px;font-weight:600;color:#fff;cursor:pointer;
+  backdrop-filter:blur(8px);font-family:'Sora',sans-serif;
+}
+.ayar-modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.6);z-index:8000;
+  padding:20px 14px;overflow-y:auto;
+}
+.ayar-kart{
+  background:#fff;border-radius:20px;padding:20px;
+  max-width:400px;margin:60px auto 0;
+}
+.ayar-baslik{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:20px;
+}
+.ayar-baslik h3{font-size:15px;font-weight:600;color:var(--text1)}
+.ayar-kapat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;cursor:pointer;font-size:13px}
+.ayar-satir{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:13px 0;border-bottom:1px solid var(--bg);
+}
+.ayar-satir:last-child{border-bottom:none}
+.ayar-satir-sol{min-width:0}
+.ayar-satir-ad{font-size:13px;font-weight:500;color:var(--text1)}
+.ayar-satir-alt{font-size:11px;color:var(--text3);margin-top:2px}
+.ayar-tehlike{
+  color:var(--ruby);background:var(--ruby-lt);border:1.5px solid #fca5a5;
+  border-radius:9px;padding:8px 14px;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap;
+}
+.ayar-normal{
+  color:var(--text1);background:var(--surface2);border:1px solid var(--border);
+  border-radius:9px;padding:8px 14px;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap;
+}
+
 .ai-sekme{
   flex:1;padding:10px 4px;font-size:11px;font-weight:600;
   border:none;background:none;cursor:pointer;
@@ -682,6 +760,74 @@ body{
 <body>
 
 <!-- ══ ÖZET ════════════════════════════════════════════════════════════ -->
+
+<!-- ── PIN OVERLAY ── -->
+<div class="pin-overlay" id="pinOverlay">
+  <div class="pin-logo">💰</div>
+  <div class="pin-baslik">Finans Takibim</div>
+  <div class="pin-alt">PIN'inizi girin</div>
+  <div class="pin-noktalar" id="pinNoktalar">
+    <div class="pin-nokta" id="pn0"></div>
+    <div class="pin-nokta" id="pn1"></div>
+    <div class="pin-nokta" id="pn2"></div>
+    <div class="pin-nokta" id="pn3"></div>
+    <div class="pin-nokta" id="pn4"></div>
+    <div class="pin-nokta" id="pn5"></div>
+  </div>
+  <div class="pin-hata" id="pinHata"></div>
+  <div class="pin-klavye">
+    <button class="pin-tus" onclick="pinTus('1')">1</button>
+    <button class="pin-tus" onclick="pinTus('2')">2</button>
+    <button class="pin-tus" onclick="pinTus('3')">3</button>
+    <button class="pin-tus" onclick="pinTus('4')">4</button>
+    <button class="pin-tus" onclick="pinTus('5')">5</button>
+    <button class="pin-tus" onclick="pinTus('6')">6</button>
+    <button class="pin-tus" onclick="pinTus('7')">7</button>
+    <button class="pin-tus" onclick="pinTus('8')">8</button>
+    <button class="pin-tus" onclick="pinTus('9')">9</button>
+    <button class="pin-tus bos"></button>
+    <button class="pin-tus" onclick="pinTus('0')">0</button>
+    <button class="pin-tus sil" onclick="pinSil()">⌫</button>
+  </div>
+  <div class="pin-ilk-bilgi" id="pinIlkBilgi" style="display:none">
+    İlk girişte PIN'inizi belirleyin
+  </div>
+</div>
+
+<!-- ── AYARLAR BUTONU ── -->
+<button class="ayar-btn" onclick="ayarAc()" id="ayarBtn" style="display:none">⚙️ Ayarlar</button>
+
+<!-- ── AYARLAR MODAL ── -->
+<div class="ayar-modal" id="ayarModal">
+  <div class="ayar-kart">
+    <div class="ayar-baslik">
+      <h3>⚙️ Ayarlar</h3>
+      <button class="ayar-kapat" onclick="ayarKapat()">✕</button>
+    </div>
+    <div class="ayar-satir">
+      <div class="ayar-satir-sol">
+        <div class="ayar-satir-ad">PIN Değiştir</div>
+        <div class="ayar-satir-alt">Yeni 6 haneli PIN belirle</div>
+      </div>
+      <button class="ayar-normal" onclick="pinDegistir()">Değiştir</button>
+    </div>
+    <div class="ayar-satir">
+      <div class="ayar-satir-sol">
+        <div class="ayar-satir-ad">Tüm Verileri Sıfırla</div>
+        <div class="ayar-satir-alt">Gelirler, borçlar, giderler silinir</div>
+      </div>
+      <button class="ayar-tehlike" onclick="veriSifirla()">Sıfırla</button>
+    </div>
+    <div class="ayar-satir">
+      <div class="ayar-satir-sol">
+        <div class="ayar-satir-ad">Sürüm</div>
+        <div class="ayar-satir-alt">Finans Takibim v2.0</div>
+      </div>
+      <span style="font-size:11px;color:var(--text3)">2026</span>
+    </div>
+  </div>
+</div>
+
 <div id="s-ozet" class="sayfa aktif">
   <div class="ozet-header">
     <h1>Finans Takibim</h1>
@@ -790,16 +936,7 @@ body{
       <div></div>
     </div>
   </div>
-  <div style="padding:10px 14px 14px">
-    <button onclick="veriSifirla()" style="
-      width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-      background:var(--surface);border:1.5px solid var(--ruby-lt);border-radius:var(--radius);
-      padding:10px;font-size:12px;font-weight:600;cursor:pointer;
-      font-family:'Sora',sans-serif;color:var(--ruby);
-      box-shadow:0 2px 8px rgba(0,0,0,.06);transition:all .15s;
-    ">🗑️ Tüm Verileri Sıfırla</button>
-  </div>
-  <div style="height:4px"></div>
+  <div style="height:14px"></div>
 </div>
 
 <!-- ══ GELİRLER ══════════════════════════════════════════════════════ -->
@@ -1215,9 +1352,9 @@ function syncGoster(durum){
     el.style.cssText='position:fixed;top:12px;right:12px;font-size:10px;font-weight:600;padding:4px 10px;border-radius:20px;z-index:9999;transition:opacity .3s';
     document.body.appendChild(el);
   }
-  if(durum==='sync')  { el.style.background='#dbeafe';el.style.color='#1d4ed8';el.textContent='↑ Sync...';el.style.opacity='1'; }
-  if(durum==='ok')    { el.style.background='#dcfce7';el.style.color='#15803d';el.textContent='✓ Synced';setTimeout(()=>el.style.opacity='0',1500); }
-  if(durum==='hata')  { el.style.background='#fee2e2';el.style.color='#dc2626';el.textContent='⚠ Sync hata';setTimeout(()=>el.style.opacity='0',3000); }
+  if(durum==='sync')  { el.style.background='#dbeafe';el.style.color='#1d4ed8';el.textContent='Sync...';el.style.opacity='1'; }
+  if(durum==='ok')    { el.style.background='#dcfce7';el.style.color='#15803d';el.textContent='Synced';setTimeout(()=>el.style.opacity='0',1500); }
+  if(durum==='hata')  { el.style.background='#fee2e2';el.style.color='#dc2626';el.textContent='Sync hata';setTimeout(()=>el.style.opacity='0',3000); }
 }
 
 // Tüm ls* fonksiyonlarından sonra çağrılacak
@@ -1239,6 +1376,106 @@ const _sifir = localStorage.getItem('ft2_sifir')==='1';
 let gelirler = (!_sifir && _yukle('ft2_gelirler')) || [];
 let borclar  = (!_sifir && _yukle('ft2_borclar'))  || [];
 let giderler = (!_sifir && _yukle('ft2_giderler')) || [];
+
+
+
+// PIN
+const PIN_KEY='ft2_pin';
+let pinGirilen='',pinMod='giris',pinIlkGirilen='';
+
+function pinBaslat(){
+  const kayitli=localStorage.getItem(PIN_KEY);
+  if(!kayitli){
+    pinMod='ilk';
+    document.querySelector('.pin-alt').textContent='Yeni 6 haneli PIN girin';
+    document.getElementById('pinIlkBilgi').style.display='';
+  } else {
+    pinMod='giris';
+    document.querySelector('.pin-alt').textContent='PIN giriniz';
+  }
+  document.getElementById('pinOverlay').style.display='flex';
+  document.getElementById('ayarBtn').style.display='none';
+}
+
+function pinTus(n){
+  if(pinGirilen.length>=6) return;
+  pinGirilen+=n;
+  pinNoktaGuncelle();
+  if(pinGirilen.length===6) setTimeout(pinKontrol,150);
+}
+
+function pinSil(){
+  pinGirilen=pinGirilen.slice(0,-1);
+  pinNoktaGuncelle();
+  document.getElementById('pinHata').textContent='';
+}
+
+function pinNoktaGuncelle(){
+  for(let i=0;i<6;i++){
+    document.getElementById('pn'+i).classList.toggle('dolu',i<pinGirilen.length);
+  }
+}
+
+function pinKontrol(){
+  const kayitli=localStorage.getItem(PIN_KEY);
+  if(pinMod==='ilk'){
+    if(!pinIlkGirilen){
+      pinIlkGirilen=pinGirilen; pinGirilen='';
+      pinNoktaGuncelle();
+      document.querySelector('.pin-alt').textContent='PIN tekrar girin';
+      document.getElementById('pinHata').textContent='';
+    } else {
+      if(pinGirilen===pinIlkGirilen){ localStorage.setItem(PIN_KEY,pinGirilen); pinAc(); }
+      else {
+        document.getElementById('pinHata').textContent='PINler uyusmadi';
+        pinGirilen=''; pinIlkGirilen=''; pinNoktaGuncelle();
+        document.querySelector('.pin-alt').textContent='Yeni 6 haneli PIN girin';
+      }
+    }
+    return;
+  }
+  if(pinMod==='degistir'){
+    if(!pinIlkGirilen){
+      pinIlkGirilen=pinGirilen; pinGirilen='';
+      pinNoktaGuncelle();
+      document.querySelector('.pin-alt').textContent='Tekrar girin';
+    } else {
+      if(pinGirilen===pinIlkGirilen){ localStorage.setItem(PIN_KEY,pinGirilen); pinAc(); toast('PIN guncellendi'); }
+      else {
+        document.getElementById('pinHata').textContent='PINler uyusmadi';
+        pinGirilen=''; pinIlkGirilen=''; pinNoktaGuncelle();
+        document.querySelector('.pin-alt').textContent='Yeni PIN belirle';
+      }
+    }
+    return;
+  }
+  if(pinGirilen===kayitli){ pinAc(); }
+  else {
+    document.getElementById('pinHata').textContent='Yanlis PIN';
+    pinGirilen=''; pinNoktaGuncelle();
+  }
+}
+
+function pinAc(){
+  document.getElementById('pinOverlay').style.display='none';
+  document.getElementById('ayarBtn').style.display='';
+  pinGirilen=''; pinIlkGirilen='';
+}
+
+function pinDegistir(){
+  ayarKapat();
+  pinMod='degistir'; pinGirilen=''; pinIlkGirilen='';
+  pinNoktaGuncelle();
+  document.querySelector('.pin-alt').textContent='Yeni 6 haneli PIN girin';
+  document.getElementById('pinHata').textContent='';
+  document.getElementById('pinIlkBilgi').style.display='';
+  document.getElementById('pinOverlay').style.display='flex';
+  document.getElementById('ayarBtn').style.display='none';
+}
+
+function ayarAc(){ document.getElementById('ayarModal').style.display=''; }
+function ayarKapat(){ document.getElementById('ayarModal').style.display='none'; }
+
 
 function veriSifirla(){
   var onay1 = confirm('TUM veriler silinecek! Gelirler, borclar, giderler ve odemeler. Devam?');
@@ -1342,7 +1579,7 @@ function ozRender(){
   document.getElementById('ozHarcama').textContent = fmtK(buAyHar);
   document.getElementById('ozNet').textContent     = (net>=0?'+':'')+fmt(net);
   document.getElementById('ozNet').style.color     = net>=0?'rgba(255,255,255,1)':'#ff6b6b';
-  document.getElementById('ozBorcOran').textContent= '%'+Math.round(topBorc/(topGelir||1)*100);
+  document.getElementById('ozBorcOran').textContent = '%'+Math.round(topBorc/(topGelir||1)*100);
 
   // Hız nav alt bilgiler
   document.getElementById('ozGelirAlt').textContent = aktifGelirler.length+' aktif kaynak';
@@ -1434,7 +1671,7 @@ function gelRender(){
     : gelirler.map(g=>{
         const var_=!g.skipAylar.includes(buAy);
         const gs=g.gunMin===g.gunMax?`Her ay ${g.gunMin}. gün`:`Her ay ${g.gunMin}-${g.gunMax}. günler`;
-        const skip=g.skipAylar.length>0?`<div class="gk-skip">⛔ ${g.skipAylar.map(i=>AYLAR[i]).join(', ')} yok</div>`:'';
+        const skip=g.skipAylar.length>0?`<div class="gk-skip">⛔ ${g.skipAylar.map(i=>AYLAR[i]).join(', ')} yok</div>`: '';
         return `<div class="gelir-kart" style="${!var_?'opacity:.45':''}">
           <div class="gk-renk"></div>
           <div class="gk-bilgi">
@@ -1449,8 +1686,8 @@ function gelRender(){
 
 function gelFormAc(id){
   gelEditId=id; gelSkipSec=[];
-  if(id){ const g=gelirler.find(x=>x.id===id); document.getElementById('gelFormBas').textContent='✏️ Geliri Düzenle'; document.getElementById('gfAd').value=g.ad; document.getElementById('gfTutar').value=g.tutar; document.getElementById('gfGunMin').value=g.gunMin; document.getElementById('gfGunMax').value=g.gunMax; gelSkipSec=[...g.skipAylar]; }
-  else { document.getElementById('gelFormBas').textContent='➕ Yeni Gelir'; ['gfAd','gfTutar','gfGunMin','gfGunMax'].forEach(x=>document.getElementById(x).value=''); }
+  if(id){ const g=gelirler.find(x=>x.id===id); document.getElementById('gelFormBas').textContent = '✏️ Geliri Düzenle'; document.getElementById('gfAd').value=g.ad; document.getElementById('gfTutar').value=g.tutar; document.getElementById('gfGunMin').value=g.gunMin; document.getElementById('gfGunMax').value=g.gunMax; gelSkipSec=[...g.skipAylar]; }
+  else { document.getElementById('gelFormBas').textContent = '➕ Yeni Gelir'; ['gfAd','gfTutar','gfGunMin','gfGunMax'].forEach(x=>document.getElementById(x).value=''); }
   gelRenderSkip();
   document.getElementById('gelForm').style.display='block';
   document.getElementById('gelForm').scrollIntoView({behavior:'smooth',block:'start'});
@@ -1481,7 +1718,7 @@ function bRender(){
   const topGelir=gelirler.filter(g=>!g.skipAylar.includes(new Date().getMonth())).reduce((s,g)=>s+g.tutar,0);
   document.getElementById('bTB').textContent=fmtK(tB);
   document.getElementById('bTM').textContent=fmtK(tM);
-  document.getElementById('bOR').textContent='%'+Math.round(tB/(topGelir||1)*100);
+  document.getElementById('bOR').textContent = '%'+Math.round(tB/(topGelir||1)*100);
   document.getElementById('bKmhBdg').textContent=km.length+' · '+fmtK(km.reduce((s,d)=>s+d.borc,0));
   document.getElementById('bKkBdg').textContent=kk.length+' · '+fmtK(kk.reduce((s,d)=>s+d.borc,0));
   document.getElementById('bKrBdg').textContent=kr.length+' · '+fmtK(kr.reduce((s,d)=>s+d.borc,0));
@@ -1732,7 +1969,7 @@ function bFormAc(tip,id){
   document.getElementById('bFBnk').value=''; document.getElementById('bFMnl').value=''; document.getElementById('bFMnl').style.display='none'; document.getElementById('bKrOz').style.display='none';
   if(bEditId){
     const d=borclar.find(x=>x.id===bEditId); bSecTip=d.tip;
-    document.getElementById('bFBas').textContent='✏️ Borcu Düzenle';
+    document.getElementById('bFBas').textContent = '✏️ Borcu Düzenle';
     const pfx={kmh:'KMH - ',kredi_karti:'K.Kartı - ',kredi:'Kredi - '};
     const bnk=d.ad.replace(pfx[d.tip]||'','');
     bBankaEkle(bnk);
@@ -1740,7 +1977,7 @@ function bFormAc(tip,id){
     if(!sel.value){ sel.value='__d__'; document.getElementById('bFMnl').style.display=''; document.getElementById('bFMnl').value=bnk; }
     if(d.tip==='kredi'){ document.getElementById('bFTk').value=d.taksit; document.getElementById('bFTT').value=d.taksitTutar; document.getElementById('bFKrG').value=d.odemeGun||''; document.getElementById('bFKrF').value=d.faiz||0; bKrHesap(); }
     else { document.getElementById('bFBrc').value=d.borc; document.getElementById('bFFz').value=d.faiz; document.getElementById('bFOG').value=d.odemeGun||''; document.getElementById('bFHd').value=d.hedef||''; if(d.tip==='kredi_karti'){ document.getElementById('bFKs').value=d.kesimGun||''; document.getElementById('bFSO').value=d.sonOdemeGun||''; } }
-  } else { document.getElementById('bFBas').textContent='➕ Yeni Borç'; document.getElementById('bFFz').value='4.25'; }
+  } else { document.getElementById('bFBas').textContent = '➕ Yeni Borç'; document.getElementById('bFFz').value='4.25'; }
   bTipDegis(bSecTip);
   document.getElementById('bFrm').style.display='block';
   document.getElementById('bFrm').scrollIntoView({behavior:'smooth',block:'start'});
@@ -1751,7 +1988,7 @@ function bTipDegis(t){
   document.getElementById('bTKmh').className='tbtn'+(t==='kmh'?' t-kmh':'');
   document.getElementById('bTKk').className='tbtn'+(t==='kredi_karti'?' t-kk':'');
   document.getElementById('bTKr').className='tbtn'+(t==='kredi'?' t-kr':'');
-  document.getElementById('bAlKK').style.display=t==='kredi'?'none':'';
+  document.getElementById('bAlKK').style.display=t==='kredi'?'none':''; 
   document.getElementById('bAlKKonly').style.display=t==='kredi_karti'?'':'none';
   document.getElementById('bAlKr').style.display=t==='kredi'?'':'none';
   document.getElementById('bFOGLbl').textContent=t==='kmh'?'Ödeme günü':'Son ödeme günü';
@@ -1799,7 +2036,7 @@ function gKartHTML(g){
   const d=new Date(g.tarih), ts=`${d.getDate()} ${AYLAR[d.getMonth()]}`;
   let tablo='';
   if(g.odemeTip==='taksit'){ tablo=`<div class="taksit-tablo"><div class="tb-t">📅 Taksit planı</div>${g.taksitler.map((t,i)=>`<div class="trow"><span>${i+1}. taksit · ${AYLAR[t.ay]} ${t.yil}</span><span style="font-weight:700">${fmt(t.tutar)}</span></div>`).join('')}</div>`; }
-  const donemTxt=g.donem?`${AYLAR[g.donem.ay]} ${g.donem.yil}`:'';
+  const donemTxt=g.donem?`${AYLAR[g.donem.ay]} ${g.donem.yil}`: '';
   const kartKisa = (g.kartAd||'').replace('K.Kartı - ','');
   const altBilgi = kartKisa + (g.odemeTip==='taksit'?' · '+(g.taksitKalan||g.taksitSay)+'/'+g.taksitSay+' taksit · '+fmt(g.aylikTaksit||Math.round(g.tutar/g.taksitSay)):'');
   return `<div class="hkart">
@@ -1872,7 +2109,7 @@ function gFormAc(){
   gEditId=null;
   document.getElementById('gFTarih').value=bugun(); document.getElementById('gFTutar').value=''; document.getElementById('gFNot').value=''; document.getElementById('gFKat').value='Market'; document.getElementById('gFTaksitSay').value=''; document.getElementById('gFTaksitKalan').value=''; document.getElementById('gFAylikTaksit').value=''; document.getElementById('gYansimaBox').style.display='none';
   gKKDoldur(); gKMHDoldur(); gTipDegis('kk'); gOdemeTip('tek');
-  document.getElementById('gFBas').textContent='➕ Yeni Harcama';
+  document.getElementById('gFBas').textContent = '➕ Yeni Harcama';
   document.getElementById('gFrm').style.display='block';
   document.getElementById('gFrm').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -1898,8 +2135,8 @@ function gOdemeTip(t){
 function gDuzenle(id){
   const g=giderler.find(x=>x.id===id); if(!g) return;
   gEditId=id; gKKDoldur(); gKMHDoldur();
-  document.getElementById('gFBas').textContent='✏️ Harcamayı Düzenle';
-  document.getElementById('gFTarih').value=g.tarih; document.getElementById('gFTutar').value=g.tutar; document.getElementById('gFKat').value=g.kategori; document.getElementById('gFNot').value=g.not||'';
+  document.getElementById('gFBas').textContent = '✏️ Harcamayı Düzenle';
+  document.getElementById('gFTarih').value=g.tarih; document.getElementById('gFTutar').value=g.tutar; document.getElementById('gFKat').value=g.kategori; document.getElementById('gFNot').value=g.not||''; 
   gTipDegis(g.tip);
   if(g.tip==='kk'){ document.getElementById('gFKart').value=g.kartId; gOdemeTip(g.odemeTip||'tek'); if(g.odemeTip==='taksit'){ document.getElementById('gFTaksitSay').value=g.taksitSay||''; document.getElementById('gFTaksitKalan').value=g.taksitKalan||g.taksitSay||''; document.getElementById('gFAylikTaksit').value=g.aylikTaksit||''; } gYansima(); }
   else { if(g.kmhBankaId) document.getElementById('gFKmh').value=g.kmhBankaId; }
@@ -2087,8 +2324,8 @@ function odDuzenle(kartId, odId){
   sel.value=kartId;
   document.getElementById('odFTutar').value=p.tutar;
   document.getElementById('odFTarih').value=p.tarih;
-  document.getElementById('odFNot').value=p.not||'';
-  document.querySelector('#odFrm div').textContent='✏️ Ödemeyi Düzenle';
+  document.getElementById('odFNot').value=p.not||''; 
+  document.querySelector('#odFrm div').textContent = '✏️ Ödemeyi Düzenle';
   document.getElementById('odFrm').style.display='';
   odBankaSecildi();
   document.getElementById('odFrm').scrollIntoView({behavior:'smooth',block:'start'});
@@ -2129,9 +2366,9 @@ function odKaydet(){
   borclar=borclar.map(x=>x.id===kartId?{...x,borc:Math.max(0,x.borc-tutar),odemeler:d.odemeler,odemeListe:d.odemeListe}:x);
   lsB();
   document.getElementById('odFrm').style.display='none';
-  document.querySelector('#odFrm div').textContent='➕ Yeni Ödeme Ekle';
+  document.querySelector('#odFrm div').textContent = '➕ Yeni Ödeme Ekle';
   odRender(); ozRender(); bRender();
-  toast('✅ Ödeme kaydedildi: '+fmt(tutar));
+  toast('Odeme kaydedildi: '+fmt(tutar));
 }
 
 function odSil(kartId, odId){
@@ -2471,6 +2708,7 @@ Gerçek verilere dayanarak kısa, pratik, net cevaplar ver. Türkçe konuş.`,
 // ════════════════════════════════════════════════════════════════════
 // BAŞLAT
 // ════════════════════════════════════════════════════════════════════
+pinBaslat();
 ozRender();
 
 (async function(){
