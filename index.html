@@ -883,7 +883,7 @@ body{
   </div>
 
   <!-- Import Modal -->
-  <div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:500;padding:20px 14px;overflow-y:auto">
+  <div id="importModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99998;padding:20px 14px;overflow-y:auto">
     <div style="background:#fff;border-radius:20px;padding:20px;max-width:400px;margin:0 auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
         <div style="font-size:15px;font-weight:600">📥 KK Taksit Planı Girişi</div>
@@ -2197,37 +2197,25 @@ let aiMesajlar=[];
 let aiBaslandi=false;
 
 window.importModalAc = function importModalAc(){
-  // KK kartlarını bul
-  const kkler = borclar.filter(d=>d.tip==='kredi_karti');
-  const aylar = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-  const buAy = new Date().getMonth(); // 2 = Mart → Nisan=3
-  const sonrakiAylar = [3,4,5,6,7,8]; // Nisan→Eylül 2026
-  
-  let html = '';
-  kkler.forEach(k=>{
-    const kisa = k.ad.replace('K.Kartı - ','');
-    // Mevcut taksit planı varsa yükle
-    const mevcut = (k.taksitPlani||[]);
-    html += `<div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:600;color:var(--text1);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)">
-        💳 ${kisa}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">`;
-    sonrakiAylar.forEach(ayIdx=>{
-      const yil = 2026;
-      const mevVal = mevcut.find(m=>m.ay===ayIdx&&m.yil===yil);
-      html += `<div>
-        <label style="font-size:10px;color:var(--text3);font-weight:600;display:block;margin-bottom:4px">${aylar[ayIdx]} ${yil}</label>
-        <input type="number" class="fi" style="font-size:12px;padding:8px 10px" 
-          id="imp_${k.id}_${ayIdx}" 
-          placeholder="0" 
-          value="${mevVal?mevVal.tutar:''}"
-        />
-      </div>`;
+  var kkler = borclar.filter(function(d){return d.tip==='kredi_karti';});
+  var AYISIM = ['Oca','Sub','Mar','Nis','May','Haz','Tem','Agu','Eyl','Eki','Kas','Ara'];
+  var sonrakiAylar = [3,4,5,6,7,8];
+  var html = '';
+  kkler.forEach(function(k){
+    var kisa = k.ad.replace('K.Kartı - ','').replace('K.Karti - ','');
+    var mevcut = k.taksitPlani||[];
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="font-size:12px;font-weight:600;color:#1a1a2e;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #eee">💳 '+kisa+'</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">';
+    sonrakiAylar.forEach(function(ayIdx){
+      var mevVal = mevcut.find(function(m){return m.ay===ayIdx&&m.yil===2026;});
+      html += '<div>';
+      html += '<label style="font-size:10px;color:#888;font-weight:600;display:block;margin-bottom:4px">'+AYISIM[ayIdx]+' 2026</label>';
+      html += '<input type="number" class="fi" style="font-size:12px;padding:8px 10px" id="imp_'+k.id+'_'+ayIdx+'" placeholder="0" value="'+(mevVal?mevVal.tutar:'')+'">';
+      html += '</div>';
     });
-    html += `</div></div>`;
+    html += '</div></div>';
   });
-  
   document.getElementById('importIcerik').innerHTML = html;
   document.getElementById('importModal').style.display = '';
 }
