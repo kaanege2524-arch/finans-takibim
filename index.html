@@ -1183,21 +1183,23 @@ async function sbKaydet(payload){
         gelirler: JSON.stringify(gelirler),
         borclar:  JSON.stringify(borclar),
         giderler: JSON.stringify(giderler),
-        guncelleme: new Date().toISOString()
+        updated_at: new Date().toISOString()
       });
-    const r = await fetch(SB_URL+'/rest/v1/finans_data',{
+    const r = await fetch(SB_URL+'/rest/v1/finans_data?on_conflict=user_id',{
       method:'POST',
       headers:{
         'apikey':SB_KEY,
         'Authorization':'Bearer '+SB_KEY,
         'Content-Type':'application/json',
-        'Prefer':'resolution=merge-duplicates'
+        'Prefer':'return=minimal,resolution=merge-duplicates'
       },
       body:body
     });
     if(!r.ok){
       const err = await r.text();
-      console.error('Supabase 400:', err);
+      console.error('Supabase hata:', r.status, err);
+    } else {
+      console.log('Supabase sync OK');
     }
     return r.ok;
   }catch(e){ console.log('Supabase kaydet hatası:',e); return false; }
