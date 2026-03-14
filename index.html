@@ -626,6 +626,14 @@ body{
    AI
 ═══════════════════════════════════════════ */
 .ai-header{background:linear-gradient(150deg,#1e1245,#4c1d95)}
+.ai-sekme{
+  flex:1;padding:10px 4px;font-size:11px;font-weight:600;
+  border:none;background:none;cursor:pointer;
+  font-family:'Sora',sans-serif;color:var(--text3);
+  border-bottom:2px solid transparent;transition:all .15s;
+}
+.ai-sekme.aktif{color:var(--violet);border-bottom-color:var(--violet)}
+.aktif-plan{background:var(--violet-lt)!important;color:var(--violet)!important;border-color:var(--violet)!important}
 .ai-chat{padding:0 14px;display:flex;flex-direction:column;gap:10px;margin-bottom:14px}
 .mesaj{max-width:88%;padding:12px 14px;border-radius:14px;font-size:13px;line-height:1.6}
 .mesaj.ai{
@@ -1061,26 +1069,79 @@ body{
 
 <div id="s-ai" class="sayfa">
   <div class="header ai-header">
-    <h1>🤖 AI Finansal Danışman</h1>
-    <p>Verilerinize göre kişisel tavsiye</p>
-    <div class="ozrow">
-      <div class="ozkutu"><div class="lb">Analiz</div><div class="dg">Canlı</div></div>
-      <div class="ozkutu"><div class="lb">Model</div><div class="dg">Claude</div></div>
-      <div class="ozkutu"><div class="lb">Dil</div><div class="dg">TR</div></div>
-    </div>
+    <h1>🤖 AI Danışman</h1>
+    <p>Gerçek verilerinizle kişisel finans analizi</p>
   </div>
-  <div class="content" style="padding-bottom:4px">
-    <div class="ai-oneri-row">
-      <button class="ai-oneri" onclick="aiSor('Genel finansal durumumu analiz et')">📊 Genel analiz</button>
+
+  <!-- Sekme butonları -->
+  <div style="display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:10">
+    <button class="ai-sekme aktif" id="aiSekme-sohbet"   onclick="aiSekmeGec('sohbet')">💬 Sohbet</button>
+    <button class="ai-sekme"       id="aiSekme-plan"     onclick="aiSekmeGec('plan')">🎯 Borç Planı</button>
+    <button class="ai-sekme"       id="aiSekme-proj"     onclick="aiSekmeGec('proj')">📈 Projeksiyon</button>
+    <button class="ai-sekme"       id="aiSekme-analiz"   onclick="aiSekmeGec('analiz')">📊 Analiz</button>
+  </div>
+
+  <!-- SOHBET -->
+  <div id="aiTab-sohbet">
+    <div class="ai-oneri-row" style="padding:10px 14px 0;flex-wrap:wrap">
+      <button class="ai-oneri" onclick="aiSor('Genel finansal durumumu analiz et')">📊 Genel</button>
       <button class="ai-oneri" onclick="aiSor('Borçlarımı en hızlı nasıl kapatırım?')">💳 Borç stratejisi</button>
       <button class="ai-oneri" onclick="aiSor('Bu ay ne kadar tasarruf edebilirim?')">💰 Tasarruf</button>
-      <button class="ai-oneri" onclick="aiSor('Hangi borcumu önce ödemeliyim?')">🎯 Öncelik sırası</button>
+      <button class="ai-oneri" onclick="aiSor('Hangi borcumu önce ödemeliyim?')">🎯 Öncelik</button>
+      <button class="ai-oneri" onclick="aiSor('Bütçemi nasıl optimize edeyim?')">⚙️ Bütçe</button>
+      <button class="ai-oneri" onclick="aiSor('Acil durum fonu oluşturabilir miyim?')">🛡️ Acil fon</button>
+    </div>
+    <div class="ai-chat" id="aiChat"></div>
+    <div class="ai-input-row">
+      <input type="text" id="aiInput" class="ai-input" placeholder="Sorunuzu yazın..." onkeydown="if(event.key==='Enter')aiGonder()"/>
+      <button class="ai-gonder" onclick="aiGonder()">Gönder</button>
     </div>
   </div>
-  <div class="ai-chat" id="aiChat"></div>
-  <div class="ai-input-row">
-    <input type="text" id="aiInput" class="ai-input" placeholder="Finansal sorunuzu yazın..." onkeydown="if(event.key==='Enter')aiGonder()"/>
-    <button class="ai-gonder" onclick="aiGonder()">Gönder</button>
+
+  <!-- BORÇ PLANI -->
+  <div id="aiTab-plan" style="display:none">
+    <div class="content">
+      <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:12px">Aylık ek ödeme bütçesi</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="number" id="planBudget" class="fi" placeholder="₺ aylık ekstra ödeme" style="flex:1"/>
+          <button onclick="aiPlanOlustur()" style="background:var(--violet);color:#fff;border:none;border-radius:9px;padding:10px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;white-space:nowrap">Plan Oluştur</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap" id="planStratejiRow">
+          <button class="ai-oneri aktif-plan" id="planStr-avalanche" onclick="planStrSec('avalanche')">🏔️ Çığ (yüksek faiz önce)</button>
+          <button class="ai-oneri" id="planStr-snowball" onclick="planStrSec('snowball')">⛄ Kartopu (küçük borç önce)</button>
+          <button class="ai-oneri" id="planStr-hybrid" onclick="planStrSec('hybrid')">⚡ Karma</button>
+        </div>
+      </div>
+      <div id="planSonuc"></div>
+    </div>
+  </div>
+
+  <!-- PROJEKSİYON -->
+  <div id="aiTab-proj" style="display:none">
+    <div class="content">
+      <div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:10px">Kaç ay ileriye bak?</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap" id="projAyRow">
+          <button class="ai-oneri aktif-plan" onclick="projAySec(6,this)">6 ay</button>
+          <button class="ai-oneri" onclick="projAySec(12,this)">12 ay</button>
+          <button class="ai-oneri" onclick="projAySec(24,this)">24 ay</button>
+        </div>
+      </div>
+      <div id="projSonuc"></div>
+    </div>
+  </div>
+
+  <!-- ANALİZ -->
+  <div id="aiTab-analiz" style="display:none">
+    <div class="content">
+      <div id="analizSonuc">
+        <div style="text-align:center;padding:20px;color:var(--text3)">
+          <div style="font-size:32px;margin-bottom:8px">📊</div>
+          <div style="font-size:13px">Analiz yükleniyor...</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2104,11 +2165,199 @@ function odRender(){
 
 function odFiltreDegis(k){ odFiltre=k; odRender(); }
 
+let planStratejisi = 'avalanche';
+let projAySayisi = 6;
+
 function aiInit(){
   if(aiBaslandi) return;
   aiBaslandi=true;
-  const karsilamaMsg = 'Merhaba! 👋 Finansal verilerinizi analiz edebilir, borç ödeme stratejisi önerebilir ve tasarruf tavsiyeleri verebilirim. Ne öğrenmek istersiniz?';
-  aiMesajEkle('ai', karsilamaMsg);
+  aiMesajEkle('ai','Merhaba! 👋 Gerçek finansal verilerinize dayanarak borç stratejisi, projeksiyon ve bütçe analizi yapabilirim. Ne öğrenmek istersiniz?');
+}
+
+function aiSekmeGec(sekme){
+  ['sohbet','plan','proj','analiz'].forEach(s=>{
+    document.getElementById('aiTab-'+s).style.display = s===sekme?'':'none';
+    document.getElementById('aiSekme-'+s).classList.toggle('aktif', s===sekme);
+  });
+  if(sekme==='analiz') aiAnalizOlustur();
+  if(sekme==='proj') aiProjGoster(projAySayisi);
+}
+
+function planStrSec(str){
+  planStratejisi=str;
+  document.querySelectorAll('#planStratejiRow .ai-oneri').forEach(b=>b.classList.remove('aktif-plan'));
+  document.getElementById('planStr-'+str).classList.add('aktif-plan');
+}
+
+function projAySec(ay, btn){
+  projAySayisi=ay;
+  document.querySelectorAll('#projAyRow .ai-oneri').forEach(b=>b.classList.remove('aktif-plan'));
+  btn.classList.add('aktif-plan');
+  aiProjGoster(ay);
+}
+
+// ── BORÇ PLANI ────────────────────────────────────────────────────────
+function aiPlanOlustur(){
+  const ekstra = Number(document.getElementById('planBudget').value)||0;
+  const el = document.getElementById('planSonuc');
+  el.innerHTML='<div style="text-align:center;padding:16px;color:var(--text3)"><div class="ai-yukleniyor"><span></span><span></span><span></span></div></div>';
+
+  const buAy=new Date().getMonth();
+  const topGelir=gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
+  const topMin=borclar.reduce((s,d)=>s+minOd(d),0);
+  const serbest=topGelir-topMin+ekstra;
+
+  const strMap={avalanche:'Çığ (yüksek faizli borçları önce kapat)',snowball:'Kartopu (küçük bakiyeli borçları önce kapat)',hybrid:'Karma (yüksek faiz + küçük bakiye dengesi)'};
+  const veri = aiVeriOzeti();
+  const prompt=`${veri}
+
+Kullanıcı aylık ${fmt(ekstra)} ek ödeme yapabilecek.
+Toplam serbest nakit: ${fmt(serbest)}/ay
+
+${strMap[planStratejisi]} stratejisiyle borç ödeme planı oluştur.
+
+Şu formatı kullan:
+1. Öncelik sırasına göre her borç için: Borç adı → Aylık ödeme → Kapanma tarihi
+2. Toplam kaç ayda borçsuz olunur
+3. Toplam faiz tasarrufu
+
+Kısa ve net tablo formatında, Türkçe yaz.`;
+
+  aiAPIcagir(prompt, el);
+}
+
+// ── PROJEKSİYON ──────────────────────────────────────────────────────
+function aiProjGoster(aylar){
+  const el=document.getElementById('projSonuc');
+  // Önce yerel hesapla
+  const AYLAR2=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  const buAy=new Date().getMonth(), buYil=new Date().getFullYear();
+  const topMin=borclar.reduce((s,d)=>s+minOd(d),0);
+  const topGelir=gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
+
+  let html=`<div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm)">
+    <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text2)">${aylar} Aylık Borç Projeksiyonu</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="background:var(--surface2)">
+        <th style="padding:7px 10px;text-align:left;font-weight:600;color:var(--text3)">Ay</th>
+        <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--text3)">Toplam Borç</th>
+        <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--text3)">Min Ödeme</th>
+        <th style="padding:7px 10px;text-align:right;font-weight:600;color:var(--text3)">Kalan Net</th>
+      </tr></thead><tbody>`;
+
+  let toplamBorc = borclar.reduce((s,d)=>s+d.borc,0);
+  for(let i=0;i<aylar;i++){
+    const ay=(buAy+i)%12, yil=buYil+Math.floor((buAy+i)/12);
+    // Faizli KMH borç artışı - min ödeme ile azalış
+    const faizArtis=borclar.filter(d=>d.tip==='kmh').reduce((s,d)=>s+Math.round(d.borc*(d.faiz||0)/100),0);
+    const minOd2=borclar.reduce((s,d)=>s+minOd(d),0);
+    const netDegisim=minOd2-faizArtis;
+    toplamBorc=Math.max(0,toplamBorc-netDegisim);
+    const gelirBuAy=gelirler.filter(g=>!g.skipAylar.includes(ay)).reduce((s,g)=>s+g.tutar,0);
+    const kalanNet=gelirBuAy-minOd2;
+    const renk=toplamBorc<borclar.reduce((s,d)=>s+d.borc,0)*0.5?'var(--emerald)':toplamBorc<borclar.reduce((s,d)=>s+d.borc,0)*0.8?'var(--amber)':'var(--ruby)';
+    html+=`<tr style="border-bottom:1px solid var(--bg)">
+      <td style="padding:6px 10px;color:var(--text2)">${AYLAR2[ay]} ${yil}</td>
+      <td style="padding:6px 10px;text-align:right;font-weight:600;color:${renk}">${fmtK(toplamBorc)}</td>
+      <td style="padding:6px 10px;text-align:right;color:var(--ruby)">${fmtK(minOd2)}</td>
+      <td style="padding:6px 10px;text-align:right;color:${kalanNet>=0?'var(--emerald)':'var(--ruby)'}">${fmtK(kalanNet)}</td>
+    </tr>`;
+  }
+  html+='</tbody></table></div>';
+
+  // AI yorumu için
+  html+=`<div id="projAIYorum" style="margin-top:10px">
+    <button onclick="aiProjYorum(${aylar})" style="width:100%;background:var(--violet);color:#fff;border:none;border-radius:var(--radius);padding:11px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">
+      🤖 AI ile Projeksiyon Yorumu Al
+    </button>
+  </div>`;
+
+  el.innerHTML=html;
+}
+
+function aiProjYorum(aylar){
+  const el=document.getElementById('projAIYorum');
+  el.innerHTML='<div style="text-align:center;padding:12px"><div class="ai-yukleniyor"><span></span><span></span><span></span></div></div>';
+  const veri=aiVeriOzeti();
+  const prompt=`${veri}
+
+${aylar} ay sonra bu finansal durumda olmak hakkında yorum yap. Risk noktaları, fırsatlar ve önerilen aksiyonlar. Kısa ve pratik, Türkçe.`;
+  aiAPIcagir(prompt, el);
+}
+
+// ── ANALİZ ──────────────────────────────────────────────────────────
+let analizYuklendi=false;
+function aiAnalizOlustur(){
+  if(analizYuklendi) return;
+  analizYuklendi=true;
+  const el=document.getElementById('analizSonuc');
+  el.innerHTML='<div style="text-align:center;padding:20px"><div class="ai-yukleniyor"><span></span><span></span><span></span></div><div style="margin-top:8px;font-size:11px;color:var(--text3)">Veriler analiz ediliyor...</div></div>';
+
+  const veri=aiVeriOzeti();
+  const prompt=`${veri}
+
+Kapsamlı finansal analiz yap. Şu başlıkları ele al:
+
+1. 🔴 ACİL DURUMLAR — Hemen yapılması gerekenler
+2. 💡 GÜÇLÜ YÖNLER — Finansal tablonun olumlu tarafları  
+3. ⚠️ RİSK NOKTALARI — Dikkat edilmesi gerekenler
+4. 🎯 ÖNERİLEN ADIMLAR — Öncelik sırasıyla 3-5 somut adım
+5. 📅 30-60-90 GÜN PLANI — Kısa vadeli eylem planı
+
+Türkçe, pratik, gerçekçi ve motive edici yaz.`;
+
+  aiAPIcagir(prompt, el);
+}
+
+// ── ORTAK API ÇAĞRISI ──────────────────────────────────────────────
+function aiVeriOzeti(){
+  const buAy=new Date().getMonth();
+  const topGelir=gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
+  const topBorc=borclar.reduce((s,d)=>s+d.borc,0);
+  const topMin=borclar.reduce((s,d)=>s+minOd(d),0);
+  const buAyHar=giderler.filter(g=>buAyMi(g.tarih)).reduce((s,g)=>s+g.tutar,0);
+  const buAy2=new Date().getMonth(), buYil2=new Date().getFullYear();
+  const buAyOdeme=borclar.reduce((s,d)=>s+((d.odemeler||{})[`${d.id}_${buAy2}_${buYil2}`]||0),0);
+  return `=== FİNANSAL VERİLER ===
+Aylık gelir: ${fmt(topGelir)}
+${gelirler.map(g=>`  - ${g.ad}: ${fmt(g.tutar)}${g.skipAylar.length?' ('+g.skipAylar.length+' ay yok)':''}`).join('
+')}
+
+Toplam borç: ${fmt(topBorc)} (Borç/Gelir: %${Math.round(topBorc/topGelir*100)})
+KMH borçları:
+${borclar.filter(d=>d.tip==='kmh').map(d=>`  - ${d.ad.replace('KMH - ','')}: ${fmt(d.borc)} | Faiz: %${d.faiz} | Min: ${fmt(minOd(d))}`).join('
+')}
+Kredi Kartları:
+${borclar.filter(d=>d.tip==='kredi_karti').map(d=>`  - ${d.ad.replace('K.Kartı - ','')}: ${fmt(d.borc)} | Min: ${fmt(minOd(d))}`).join('
+')}
+Sabit Krediler:
+${borclar.filter(d=>d.tip==='kredi').map(d=>`  - ${d.ad.replace('Kredi - ','')}: ${fmt(d.borc)} | ${d.taksit} taksit × ${fmt(d.taksitTutar)}`).join('
+')}
+
+Bu ay min ödemeler: ${fmt(topMin)}
+Bu ay yapılan ödemeler: ${fmt(buAyOdeme)}
+Bu ay harcamalar: ${fmt(buAyHar)}
+Bu ay net: ${fmt(topGelir-buAyOdeme-buAyHar)}`;
+}
+
+async function aiAPIcagir(prompt, hedefEl){
+  try{
+    const resp=await fetch('https://finans-proxy.kaanege2524.workers.dev',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1500,
+        system:'Sen bir Türk kişisel finans danışmanısın. Gerçek verilerle analiz yapıyorsun. Kısa, pratik, net ve motive edici cevaplar ver. Türkçe yaz.',
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    const data=await resp.json();
+    const metin=data.content?.[0]?.text||'Yanıt alınamadı.';
+    hedefEl.innerHTML=`<div style="background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);padding:14px;font-size:12px;line-height:1.7;color:var(--text1);white-space:pre-wrap">${metin}</div>`;
+  }catch(e){
+    hedefEl.innerHTML=`<div style="color:var(--ruby);padding:12px;font-size:12px">Bağlantı hatası. Lütfen tekrar deneyin.</div>`;
+  }
 }
 
 function aiMesajEkle(tip, metin){
@@ -2140,51 +2389,27 @@ async function aiGonder(){
   input.value='';
   aiMesajEkle('user',soru);
   aiMesajYukleniyor();
-
-  // Finansal veri özeti oluştur
-  const buAy=new Date().getMonth();
-  const topGelir=gelirler.filter(g=>!g.skipAylar.includes(buAy)).reduce((s,g)=>s+g.tutar,0);
-  const topBorc=borclar.reduce((s,d)=>s+d.borc,0);
-  const topMin=borclar.reduce((s,d)=>s+minOd(d),0);
-  const buAyHar=giderler.filter(g=>buAyMi(g.tarih)).reduce((s,g)=>s+g.tutar,0);
-
-  const veriOzeti=`Kullanıcının finansal durumu:
-- Aylık gelir: ${fmt(topGelir)} (Maaş: 81.000₺, Kira geliri: 15.000₺, Ek ders: 18.000₺ - bazı aylarda yok)
-- Toplam borç: ${fmt(topBorc)}
-- Borç/Gelir oranı: %${Math.round(topBorc/topGelir*100)}
-- Bu ay minimum ödemeler: ${fmt(topMin)}
-- Bu ay harcama: ${fmt(buAyHar)}
-- KMH borçları: ${borclar.filter(d=>d.tip==='kmh').map(d=>d.ad.replace('KMH - ','')+'='+fmt(d.borc)+' %'+d.faiz).join(', ')}
-- KK borçları: ${borclar.filter(d=>d.tip==='kredi_karti').map(d=>d.ad.replace('K.Kartı - ','')+'='+fmt(d.borc)).join(', ')}
-- Sabit krediler: ${borclar.filter(d=>d.tip==='kredi').map(d=>d.ad.replace('Kredi - ','')+'='+fmt(d.borc)+' '+d.taksit+'taksit').join(', ')}`;
-
-  const mesajlar=[
-    {role:'user',content:`${veriOzeti}\n\nSoru: ${soru}`}
-  ];
-  // Geçmiş mesajları ekle (son 6)
-  const gecmis=aiMesajlar.slice(-6);
-  const gMesajlar=gecmis.map(m=>({role:m.tip==='user'?'user':'assistant',content:m.metin}));
-  // Sistem + geçmiş + yeni
-  const tumMesajlar=[{role:'user',content:veriOzeti+'\n\nBu verilerle finansal danışmanlık yapıyorsun. Türkçe, kısa ve net cevaplar ver.'},...gMesajlar,{role:'user',content:soru}];
-
+  const gecmis=aiMesajlar.slice(-8).map(m=>({role:m.tip==='user'?'user':'assistant',content:m.metin}));
   try{
     const resp=await fetch('https://finans-proxy.kaanege2524.workers.dev',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        system:`Sen bir Türk kişisel finans danışmanısın. Kullanıcının finansal verileri: ${veriOzeti}. Kısa, pratik ve samimi cevaplar ver. Türkçe konuş.`,
-        messages:[...gMesajlar,{role:'user',content:soru}]
+        max_tokens:1200,
+        system:`Sen bir Türk kişisel finans danışmanısın. Kullanıcının güncel finansal verileri:
+${aiVeriOzeti()}
+
+Gerçek verilere dayanarak kısa, pratik, net cevaplar ver. Türkçe konuş.`,
+        messages:[...gecmis,{role:'user',content:soru}]
       })
     });
     const data=await resp.json();
     document.getElementById('aiYukleniyor')?.remove();
-    const cevap=data.content?.[0]?.text||'Bir hata oluştu.';
-    aiMesajEkle('ai',cevap);
+    aiMesajEkle('ai',data.content?.[0]?.text||'Yanıt alınamadı.');
   }catch(e){
     document.getElementById('aiYukleniyor')?.remove();
-    aiMesajEkle('ai','Bağlantı hatası. Lütfen tekrar deneyin.');
+    aiMesajEkle('ai','Bağlantı hatası.');
   }
 }
 
