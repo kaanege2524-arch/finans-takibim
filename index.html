@@ -2169,9 +2169,19 @@ function gKaydet(){
   if(gSecTip==='nakit'){
     const kmhId=Number(document.getElementById('gFKmh').value)||null, kmhK=kmhId?borclar.find(d=>d.id===kmhId):null;
     const yeni={tip:'nakit',tarih,tutar,kategori:kat,not,kmhBankaId:kmhId||null,kmhBankaAd:kmhK?kmhK.ad.replace('KMH - ',''):null};
-    if(gEditId) giderler=giderler.map(x=>x.id===gEditId?{...x,...yeni}:x);
-    else giderler.push({id:Date.now(),...yeni});
-    lsGid(); gFormKapat(); gRender(); ozRender(); toast('✅ Nakit gider kaydedildi: '+fmt(tutar)); return;
+    if(gEditId){
+      // Düzenleme: eski KMH borcunu geri al, yeni tutarı ekle
+      const eski=giderler.find(x=>x.id===gEditId);
+      if(eski&&eski.kmhBankaId) borclar=borclar.map(d=>d.id===eski.kmhBankaId?{...d,borc:Math.max(0,d.borc-eski.tutar)}:d);
+      if(kmhId) borclar=borclar.map(d=>d.id===kmhId?{...d,borc:d.borc+tutar}:d);
+      giderler=giderler.map(x=>x.id===gEditId?{...x,...yeni}:x);
+    } else {
+      giderler.push({id:Date.now(),...yeni});
+      // KMH seçildiyse borcuna ekle
+      if(kmhId) borclar=borclar.map(d=>d.id===kmhId?{...d,borc:d.borc+tutar}:d);
+    }
+    lsB(); lsGid(); gFormKapat(); gRender(); bRender(); ozRender();
+    toast('✅ '+(kmhK?kmhK.ad.replace('KMH - ','')+' borcuna yansıdı: ':'')+fmt(tutar)); return;
   }
   const kartId=Number(document.getElementById('gFKart').value); if(!kartId){toast('⚠️ Kart seçin');return;}
   const k=borclar.find(d=>d.id===kartId); if(!k){toast('⚠️ Kart bulunamadı');return;}
@@ -2622,11 +2632,11 @@ window.planHesapla = function planHesapla(){
   html += '<span style="font-size:11px;opacity:.8">'+(topKalan<=0?borcBitti+' ayda borçsuz':borcBitti+' ay')+'</span></div>';
 
   // Başlık satırı
-  html += '<div style="display:grid;grid-template-columns:52px 1fr 1fr 1fr 1fr;border-bottom:1.5px solid var(--border);background:var(--surface2)">';
-  ['Ay','Gelir','Min Ödeme','Ödeyeceğim','Kalan Borç'].forEach(h=>{
-    html += '<div style="padding:7px 6px;font-size:9px;font-weight:600;color:var(--text3);text-align:right;letter-spacing:.3px;text-transform:uppercase">'+h+'</div>';
-  });
-  html += '</div>';
+
+
+
+
+
 
   // Veri satırları
   planSatirlar.forEach(function(s,i){
@@ -2634,7 +2644,7 @@ window.planHesapla = function planHesapla(){
     var odeme = s.topMinBu;
     var kalanBorc = s.toplamKalan;
     // Kalan borç rengi: sıfır=yeşil, azaldıysa mavi, artıysa kırmızı
-    var borcRenk = kalanBorc<=0?'var(--emerald)':kalanBorc<baslangicBorc?'var(--sapphire)':'var(--ruby)';
+    var borcRenk = kalanBorc<=0?'var(--emerald)':kalanBorc<=baslangicBorc*0.3?'var(--emerald)':kalanBorc<baslangicBorc?'var(--sapphire)':'var(--ruby)';
     var kalanText = kalanBorc<=0?'✅ Bitti':fmtK(kalanBorc);
 
     // Accordion başlık — ay adı + özet
